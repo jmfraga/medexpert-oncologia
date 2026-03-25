@@ -259,39 +259,105 @@ All code, configurations, and evaluation materials are available at [repository 
 
 ## Results
 
-[TO BE COMPLETED after Arena execution]
-
 ### Response Quality by Tier
 
-[Table: mean composite score ± CI per tier, overall and by complexity]
+**Table 9.** Mean composite score (weighted) by tier, overall and by complexity level. Scores on 0–5 scale; 95% CI from bootstrap (10,000 resamples).
+
+| Tier | Overall | 95% CI | Simple (n=5) | Moderate (n=4) | Complex (n=6) |
+|------|---------|--------|--------------|----------------|----------------|
+| Light | — | — | — | — | — |
+| Light+RAG | — | — | — | — | — |
+| Básico A (MedGemma 27B) | — | — | — | — | — |
+| Básico B (MiniMax 2.7) | — | — | — | — | — |
+| Premium (Sonnet 4.6) | — | — | — | — | — |
 
 ### Performance by Evaluation Criterion
 
-[Table: mean score per tier × criterion]
+**Table 10.** Mean Opus score per tier × evaluation criterion (0–5 scale).
+
+| Tier | Diagnostic Accuracy | Guideline Adherence | Completeness | Clinical Utility |
+|------|--------------------|--------------------|--------------|-----------------|
+| Light | — | — | — | — |
+| Light+RAG | — | — | — | — |
+| Básico A (MedGemma 27B) | — | — | — | — |
+| Básico B (MiniMax 2.7) | — | — | — | — |
+| Premium (Sonnet 4.6) | — | — | — | — |
 
 ### Complexity Subgroup Analysis
 
-[Figure: score by tier stratified by case complexity — simple/moderate/complex]
+**Table 11.** Mean composite score by complexity level and tier.
+
+| Complexity | Light | Light+RAG | Básico A | Básico B | Premium |
+|------------|-------|-----------|----------|----------|---------|
+| Simple (n=5) | — | — | — | — | — |
+| Moderate (n=4) | — | — | — | — | — |
+| Complex (n=6) | — | — | — | — | — |
+
+**Figure 1.** [Bar chart: composite score by tier, grouped by complexity level — to be generated]
 
 ### Human Expert Evaluation
 
-[Table: mean human scores per tier, Krippendorff's α global and per criterion]
+**Table 12.** Mean human expert scores by tier (0–5 scale, n evaluators per case = 2).
+
+| Tier | Diagnostic Accuracy | Guideline Adherence | Completeness | Clinical Utility | Composite |
+|------|--------------------|--------------------|--------------|-----------------|-----------|
+| Light | — | — | — | — | — |
+| Light+RAG | — | — | — | — | — |
+| Básico A (MedGemma 27B) | — | — | — | — | — |
+| Básico B (MiniMax 2.7) | — | — | — | — | — |
+| Premium (Sonnet 4.6) | — | — | — | — | — |
+
+**Table 13.** Inter-rater reliability (Krippendorff's alpha).
+
+| Criterion | α | Interpretation |
+|-----------|---|---------------|
+| Diagnostic Accuracy | — | — |
+| Guideline Adherence | — | — |
+| Completeness | — | — |
+| Clinical Utility | — | — |
+| **Global (all criteria)** | **—** | **—** |
 
 ### Automated vs. Human Evaluation Agreement
 
-[Figure: scatter plot Opus vs. human scores with regression line and CI]
+**Table 14.** Correlation between Opus and human composite scores.
 
-[Figure: Bland-Altman plot]
+| Metric | Value | 95% CI |
+|--------|-------|--------|
+| Pearson r | — | — |
+| Spearman ρ | — | — |
+| Mean difference (Opus − Human) | — | — |
+| Limits of agreement (Bland-Altman) | — | — |
+| Discrepant cases (\|Δ\| > 1.0) | —/75 | — |
 
-[Correlation coefficients and discrepancy analysis]
+**Figure 2.** [Scatter plot: Opus composite score vs. mean human composite score, with regression line and 95% CI — to be generated]
+
+**Figure 3.** [Bland-Altman plot: difference (Opus − Human) vs. average — to be generated]
 
 ### Operational Performance
 
-[Table: TTFT, tokens/s, total time, cost per query by tier]
+**Table 15.** Operational metrics by tier (mean across 15 cases).
+
+| Tier | TTFT (ms) | Throughput (tok/s) | Response Time (s) | Cost/Query (USD) |
+|------|-----------|-------------------|-------------------|-----------------|
+| Light | — | — | — | ~$0 |
+| Light+RAG | — | — | — | ~$0 |
+| Básico A (MedGemma 27B) | — | — | — | ~$0 |
+| Básico B (MiniMax 2.7) | — | — | — | — |
+| Premium (Sonnet 4.6) | — | — | — | — |
 
 ### Hypothesis Testing
 
-[Table: result for each of H1–H7]
+**Table 16.** Pre-specified hypothesis results.
+
+| Hypothesis | Description | Result | Supported? |
+|------------|-------------|--------|------------|
+| H1 | Light achieves ≥70% of Premium score on simple cases | Light/Premium ratio: —% | — |
+| H2 | Basic tiers + RAG outperform Light on complex cases | Δ score: — | — |
+| H3 | Premium not significantly superior to Basic on simple cases | Δ score: — (95% CI: —) | — |
+| H4 | Light TTFT <2s vs. Premium >5s | Light: —ms, Premium: —ms | — |
+| H5 | Light cost <$0.001 vs. $0.05–0.15 for Basic/Premium | Light: $—, Premium: $— | — |
+| H6 | Opus–Human correlation r > 0.80 | r = — | — |
+| H7 | Light+RAG outperforms Light alone on complex cases | Δ score: — | — |
 
 ---
 
