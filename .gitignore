@@ -1,0 +1,9 @@
+# LoRA adapter weights (too large for git, backup to Kingston)
+adapters/
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+.DS_Store
