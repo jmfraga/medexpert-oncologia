@@ -51,16 +51,26 @@ echo "Validation examples: $VALID_COUNT"
 echo ""
 
 # ── Run LoRA training ──
+# Note: mlx_lm >= 0.22 uses `python -m mlx_lm lora` (not `mlx_lm.lora`)
+#       --lora-layers replaced by --num-layers
+#       --lora-parameters replaced by --config (YAML file)
 echo "Starting LoRA training at $(date)..."
 echo "Logs: $PROJECT_DIR/logs/training-$ADAPTER_SUFFIX.log"
 
-$MLX_ENV/python -m mlx_lm.lora \
+# Resume support: if adapter already has checkpoints, resume from last
+RESUME_FLAG=""
+if [ -f "$ADAPTER_PATH/adapters.safetensors" ]; then
+    echo "Found existing adapter, resuming..."
+    RESUME_FLAG="--resume-adapter-file $ADAPTER_PATH"
+fi
+
+$MLX_ENV/python -m mlx_lm lora \
     --model "$MODEL" \
     --train \
     --data "$DATA_DIR" \
     --adapter-path "$ADAPTER_PATH" \
     --batch-size 4 \
-    --lora-layers -1 \
+    --num-layers -1 \
     --learning-rate 2e-5 \
     --iters "$ITERS" \
     --val-batches 50 \
@@ -70,7 +80,8 @@ $MLX_ENV/python -m mlx_lm.lora \
     --max-seq-length 2048 \
     --grad-checkpoint \
     --mask-prompt \
-    --lora-parameters '{"rank": 64, "dropout": 0.05, "scale": 32.0}' \
+    --config "$PROJECT_DIR/lora-config.yaml" \
+    $RESUME_FLAG \
     2>&1 | tee "$PROJECT_DIR/logs/training-$ADAPTER_SUFFIX.log"
 
 echo ""
