@@ -390,7 +390,7 @@ medexpert-admin/arena/
 2. **Reporte por caso**: respuesta de cada candidato + evaluación Opus + evaluación humana
 3. **Análisis de concordancia**: Krippendorff's α inter-evaluadores + correlación Opus-humanos
 4. **Recomendación de tier**: qué candidato usar para qué tipo de consulta
-5. **Paper SMEO 2026**: evaluación formal con los 15 casos, doble jueceo (LLM + humanos)
+5. **Paper**: evaluación formal con los 15 casos, doble jueceo (LLM + humanos)
 6. **Configuración de producción**: reglas para asignar tier según tipo de consulta del usuario
 7. **Anexo completo de la publicación**: documento con las 75 respuestas íntegras (15 casos × 5 candidatos), cada una con:
    - Caso clínico original
@@ -405,7 +405,7 @@ medexpert-admin/arena/
 - **JSON**: datos crudos para análisis programático
 - **HTML**: reporte visual interactivo (respuestas lado a lado con scores)
 - **CSV**: tablas para análisis estadístico en R/Python
-- **PDF**: documento formal para anexo de publicación SMEO
+- **PDF**: documento formal para anexo de publicación
 
 ---
 

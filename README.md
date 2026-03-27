@@ -1,6 +1,6 @@
 # MedExpert Oncologia — Fine-tuning & Arena
 
-Pipeline de fine-tuning de modelos LLM para oncologia clinica y evaluacion comparativa (Arena) para el paper SMEO 2026.
+Pipeline de fine-tuning de modelos LLM para oncologia clinica y evaluacion comparativa (Arena).
 
 ## Modelos entrenados
 
@@ -36,7 +36,7 @@ Compara 6 estrategias de respuesta clinica oncologica contra 15 casos clinicos c
 
 **Juez**: Claude Opus 4.6 + RAG (no compite como candidato)
 
-### Comparaciones clave para el paper
+### Comparaciones clave
 
 - **RAG vs fine-tune**: tiers 1 vs 2 (llama8b), tiers 3 vs 4 (gpt-oss)
 - **Denso vs MoE**: tiers 2 vs 4 (fine-tuned, mismo dataset)
@@ -115,6 +115,3 @@ medexpert-oncologia/
 - ChromaDB con corpus oncologico indexado (en M1 MedExpert)
 - API keys: Anthropic, MiniMax
 
-## Paper
-
-Fraga-Sastrias JM et al. "Evaluacion comparativa de estrategias LLM para asistencia clinica en oncologia: fine-tuning local vs RAG vs modelos frontier". SMEO 2026.
