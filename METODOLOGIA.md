@@ -40,14 +40,19 @@ Documento (PDF/DOCX/TXT)
 
 ---
 
-## 2. Entrenamiento del Modelo Ligero (llama8b-onco)
+## 2. Entrenamiento de Modelos Locales
 
-### 2.1 Modelo base
+### 2.1 Modelos base
 
-- **Modelo**: Meta-Llama-3.1-8B-Instruct (4-bit quantized)
-- **Fuente**: mlx-community/Meta-Llama-3.1-8B-Instruct-4bit
-- **Justificación**: Instruct ya tiene capacidad de seguir instrucciones; el fine-tune agrega conocimiento de dominio oncológico sin necesidad de instruction tuning previo
+Se entrenan dos modelos con el mismo dataset para comparar arquitecturas:
+
+| Modelo | Tipo | Parámetros | Fuente | Justificación |
+|--------|------|-----------|--------|---------------|
+| **llama8b-onco** | Denso | 8B | mlx-community/Meta-Llama-3.1-8B-Instruct-4bit | Modelo eficiente, bajo consumo de memoria (~11 GB) |
+| **gpt-oss-20b-onco** | MoE | 20B | InferenceIllusionist/gpt-oss-20b-MLX-4bit | Mayor capacidad, compara denso vs MoE (~31 GB) |
+
 - **Hardware**: Mac Mini M4, 64 GB RAM, Apple Silicon
+- **Framework**: mlx-lm 0.31.1 (nativo Apple Silicon)
 
 ### 2.2 Muestreo estratificado del corpus
 
@@ -104,7 +109,7 @@ Por cada chunk seleccionado, el teacher genera 3 pares pregunta-respuesta:
 | Rank | 64 | Dominio médico denso requiere más capacidad que rank 8-16 estándar |
 | Capas | Todas (-1) | Conocimiento médico distribuido en todas las capas del transformer |
 | Batch size | 4 | Balance entre velocidad y estabilidad |
-| Learning rate | 2e-5 | Estándar para LoRA en modelos 8B |
+| Learning rate | 2e-5 (llama8b), 1e-5 (gpt-oss) | Estándar para LoRA; reducido para modelo más grande |
 | Iteraciones | 3,000 (full) | Calibrado para ~35K examples |
 | Max seq length | 2,048 | Suficiente para Q&A clínico |
 | Dropout | 0.05 | Regularización ligera para dataset especializado |
@@ -114,11 +119,42 @@ Por cada chunk seleccionado, el teacher genera 3 pares pregunta-respuesta:
 
 **Framework**: mlx-lm 0.31.1 (nativo Apple Silicon)
 
-### 2.5 Post-entrenamiento
+### 2.5 Resultados de entrenamiento
+
+#### llama8b-onco (completado 2026-03-26, ~11 horas)
+
+| Iter | Val loss | Train loss | Observación |
+|------|----------|------------|-------------|
+| 1 | 6.031 | — | Baseline |
+| 1000 | 0.933 | 0.882 | Convergencia rápida |
+| 2000 | 0.923 | 0.855 | Estable |
+| 2600 | **0.874** | 0.846 | **Mínimo** |
+| 3000 | 0.881 | 0.860 | Final |
+
+Peak memory: 11.2 GB | Velocidad: ~0.075 it/sec, ~53 tok/sec | Tokens entrenados: 2,112,717
+
+#### gpt-oss-20b-onco (completado 2026-03-26, ~8.5 horas)
+
+| Iter | Val loss | Train loss | Observación |
+|------|----------|------------|-------------|
+| 1 | 6.031 | — | Baseline |
+| 1000 | 0.946 | 0.893 | Convergencia |
+| 1800 | 0.867 | 0.856 | Inflexión |
+| 2600 | **0.863** | 0.849 | **Mínimo** |
+| 3000 | 0.885 | 0.844 | Final |
+
+Peak memory: 30.8 GB | Velocidad: ~0.105 it/sec, ~65 tok/sec | Tokens entrenados: 1,880,841
+
+**Observaciones**:
+- gpt-oss-20b alcanza mejor val loss mínimo (0.863 vs 0.874) pese a tener más parámetros
+- Ambos modelos muestran su mejor checkpoint en iter 2600, sugiriendo que 3000 iteraciones es ligeramente excesivo
+- Sin señales de overfitting en ningún modelo
+
+### 2.6 Post-entrenamiento
 
 1. **Fusión**: LoRA adapters se fusionan al modelo base con `mlx_lm.fuse`
-2. **Modelo final**: `Llama8B-MedExpert-Oncologia` — modelo autónomo sin necesidad de adapters
-3. **Despliegue**: MLX server en M4 o conversión a GGUF para Ollama
+2. **Modelos finales**: `llama8b-onco` y `gpt-oss-20b-onco` — modelos autónomos sin necesidad de adapters
+3. **Despliegue**: MLX server en M4 (puertos 8086 y 8092 respectivamente)
 
 ---
 
@@ -126,21 +162,23 @@ Por cada chunk seleccionado, el teacher genera 3 pares pregunta-respuesta:
 
 ### 3.1 Diseño del estudio
 
-**Evaluación comparativa de 5 candidatos** de respuesta clínica oncológica:
+**Evaluación comparativa de 6 candidatos** de respuesta clínica oncológica (Arena v2):
 
-| Tier | Modelo | Provider | Enfoque | RAG |
-|------|--------|----------|---------|-----|
-| **Light** | llama8b-onco (MLX) | Meta (fine-tune local) | Conocimiento internalizado por fine-tune | No |
-| **Light+RAG** | llama8b-onco (MLX) | Meta (fine-tune local) | Conocimiento internalizado + retrieval | Sí |
-| **Básico A** | MedGemma 27B | Google | Modelo pre-entrenado en dominio médico | Sí |
-| **Básico B** | MiniMax 2.7 | MiniMax | Modelo generalista competitivo | Sí |
-| **Premium** | Sonnet 4.6 | Anthropic | Modelo frontier generalista + RAG | Sí |
+| # | Tier | Modelo | Provider | Fine-tune | RAG |
+|---|------|--------|----------|-----------|-----|
+| 1 | **llama8b base + RAG** | Meta-Llama-3.1-8B-Instruct-4bit | Meta (local) | No | Sí |
+| 2 | **llama8b-onco** | llama8b-onco LoRA (local) | Meta (fine-tune local) | Sí | No |
+| 3 | **gpt-oss-20b base + RAG** | gpt-oss-20b-MLX-4bit | Open-source (local) | No | Sí |
+| 4 | **gpt-oss-20b-onco** | gpt-oss-20b-onco LoRA (local) | Open-source (fine-tune local) | Sí | No |
+| 5 | **MiniMax-M1-80K + RAG** | MiniMax-Text-01 | MiniMax (API) | No | Sí |
+| 6 | **Sonnet 4 + RAG** | Sonnet 4 | Anthropic (API) | No | Sí |
 
 **Evaluador (juez)**: Claude Opus 4.6 + RAG (no compite como candidato, imparcial)
 
 **Preguntas de investigación**:
-1. ¿Qué estrategia da mejor resultado en oncología clínica: conocimiento internalizado, modelo médico pre-entrenado, modelo generalista competitivo, o modelo frontier con retrieval?
-2. ¿El RAG aporta valor adicional a un modelo que ya internalizó el conocimiento clínico por fine-tune?
+1. **RAG vs fine-tune**: ¿Qué estrategia da mejor resultado, retrieval sobre modelo base o fine-tuning sin retrieval? (tiers 1 vs 2, tiers 3 vs 4)
+2. **Denso vs MoE**: ¿Un modelo MoE 20B fine-tuned supera a un modelo denso 8B fine-tuned con el mismo dataset? (tier 2 vs 4)
+3. **Local vs API**: ¿Los modelos locales fine-tuned alcanzan calidad comparable a modelos API generalistas + RAG? (tier 4 vs 5 vs 6)
 
 ### 3.2 Casos clínicos de prueba
 
@@ -177,21 +215,21 @@ Escala 0-5 por criterio. La misma rúbrica se aplica tanto al juez automático (
 
 ```
 Para cada caso clínico (15):
-  Para cada candidato (5: Light, Light+RAG, Básico A, Básico B, Premium):
+  Para cada candidato (6 tiers):
     1. Enviar caso → pipeline completo del candidato
     2. Registrar respuesta completa + métricas de rendimiento
     3. Enviar respuesta al juez (Opus 4.6 + RAG + gold standard)
     4. Juez califica con rúbrica estructurada + feedback textual
-Total: 75 evaluaciones automáticas (15 casos × 5 candidatos)
+Total: 90 evaluaciones automáticas (15 casos × 6 candidatos)
 ```
 
-**Ventajas**: reproducible, sin costo de coordinación, cubre los 15 casos × 5 candidatos.
+**Ventajas**: reproducible, sin costo de coordinación, cubre los 15 casos × 6 candidatos.
 
 ### 3.5 Evaluación humana — Panel de oncólogos
 
 #### 3.5.1 Diseño
 
-Evaluación ciega por oncólogos clínicos. Las respuestas se presentan anonimizadas y en orden aleatorio (Candidato A/B/C/D/E) diferente por caso para evitar sesgo posicional. Los evaluadores no conocen qué modelo generó cada respuesta.
+Evaluación ciega por oncólogos clínicos. Las respuestas se presentan anonimizadas y en orden aleatorio (Candidato A-F) diferente por caso para evitar sesgo posicional. Los evaluadores no conocen qué modelo generó cada respuesta.
 
 **Instrumento**: Google Forms con la rúbrica de 4 criterios (§3.3), escala 0-5 por criterio, más un campo de comentarios libres por respuesta.
 
@@ -203,7 +241,7 @@ Evaluación ciega por oncólogos clínicos. Las respuestas se presentan anonimiz
 | B (recomendado) | 4 | 8 | ~2 | 160 | Buen balance |
 | C (ideal) | 5 | 6 | 2 | 120 | Carga ligera |
 
-**Cálculo de carga**: casos × 5 respuestas × 4 criterios = scores por doctor.
+**Cálculo de carga**: casos × 6 respuestas × 4 criterios = scores por doctor.
 
 La asignación de casos se hace con un **diseño de bloques incompletos balanceado** (BIBD): cada caso es evaluado por exactamente 2 doctores, y cada doctor evalúa una distribución proporcional de complejidades (simple/moderado/complejo).
 
@@ -242,16 +280,20 @@ Para cada caso, las 5 respuestas se asignan aleatoriamente a etiquetas (Candidat
 
 ```
 Ejemplo — Caso 1:
-  Candidato A → Premium (Sonnet 4.6)
-  Candidato B → Light (llama8b-onco)
-  Candidato C → Básico B (MiniMax 2.7)
-  Candidato D → Básico A (MedGemma 27B)
+  Candidato A → Sonnet 4 + RAG
+  Candidato B → llama8b-onco (fine-tuned)
+  Candidato C → MiniMax-M1-80K + RAG
+  Candidato D → gpt-oss-20b base + RAG
+  Candidato E → llama8b base + RAG
+  Candidato F → gpt-oss-20b-onco (fine-tuned)
 
 Ejemplo — Caso 2:
-  Candidato A → Básico A (MedGemma 27B)
-  Candidato B → Premium (Sonnet 4.6)
-  Candidato C → Light (llama8b-onco)
-  Candidato D → Básico B (MiniMax 2.7)
+  Candidato A → gpt-oss-20b-onco (fine-tuned)
+  Candidato B → Sonnet 4 + RAG
+  Candidato C → llama8b base + RAG
+  Candidato D → MiniMax-M1-80K + RAG
+  Candidato E → gpt-oss-20b base + RAG
+  Candidato F → llama8b-onco (fine-tuned)
 ```
 
 El mapeo completo se almacena en `arena/results/anonymization_map.json` y se revela solo al consolidar resultados.
@@ -308,25 +350,26 @@ Los scores de Opus y humanos se reportan **por separado** (no se combinan en un 
 
 ### 3.9 Hipótesis a evaluar
 
-1. **H1**: Light (llama8b-onco sin RAG) alcanza ≥70% del score de Premium en casos simples
-2. **H2**: Básico con RAG supera a Light en casos complejos que requieren guías específicas
-3. **H3**: Premium no es significativamente mejor que Básico en casos simples (justifica tier diferenciado)
-4. **H4**: Light tiene latencia <2s vs >5s de Premium (mejor experiencia de usuario)
-5. **H5**: El costo por consulta de Light es <$0.001 vs ~$0.05-0.15 de Básico/Premium
+1. **H1**: RAG sobre modelo base supera a fine-tune sin RAG en ambas arquitecturas (llama8b y gpt-oss)
+2. **H2**: gpt-oss-20b-onco (MoE, fine-tuned) supera a llama8b-onco (denso, fine-tuned) con el mismo dataset
+3. **H3**: Los modelos locales fine-tuned alcanzan ≥70% del score de Sonnet 4 + RAG en casos simples
+4. **H4**: Los modelos locales tienen latencia <5s vs >10s de los API (mejor experiencia de usuario)
+5. **H5**: El costo por consulta local es $0 vs ~$0.05-0.15 de MiniMax/Sonnet
 6. **H6**: El score de Opus correlaciona r > 0.80 con el consenso humano (validación del juez LLM)
-7. **H7**: Light+RAG supera a Light sin RAG en casos complejos (el RAG aporta valor adicional al conocimiento internalizado)
+7. **H7**: MiniMax (generalista API) supera a los modelos locales base + RAG pero no a Sonnet
 
 ### 3.10 Arquitectura técnica de la Arena
 
 ```
 medexpert-admin/arena/
 ├── clinical_cases.json         # 15 casos clínicos con gold standard
-├── arena_runner.py             # CandidateRunner: ejecuta 5 tiers × 15 casos
-│     ├── light:    llama8b-onco (MLX), sin RAG
-│     ├── light_rag: llama8b-onco (MLX) + RAG + ChromaDB
-│     ├── basico_a: medgemma-27b + RAG + ChromaDB
-│     ├── basico_b: minimax-2.7 + RAG + ChromaDB
-│     └── premium:  sonnet 4.6 + RAG + ChromaDB
+├── arena_runner.py             # CandidateRunner: ejecuta 6 tiers × 15 casos
+│     ├── llama8b_rag:  llama8b base + RAG + ChromaDB
+│     ├── llama8b_ft:   llama8b-onco (fine-tuned), sin RAG
+│     ├── gptoss_rag:   gpt-oss-20b base + RAG + ChromaDB
+│     ├── gptoss_ft:    gpt-oss-20b-onco (fine-tuned), sin RAG
+│     ├── minimax:      MiniMax-M1-80K + RAG + ChromaDB
+│     └── sonnet:       Sonnet 4 + RAG + ChromaDB
 ├── arena_judge.py              # JudgeRunner: Opus 4.6 + RAG + rúbrica
 │     └── output: JSON con scores por criterio + feedback textual
 ├── arena_report.py             # Genera reportes + materiales para Google Forms
@@ -381,14 +424,16 @@ medexpert-oncologia/
 │   ├── valid.jsonl                # ~3,500 pares (10%)
 │   └── test.jsonl                 # ~3,500 pares (10%)
 ├── adapters/                      # LoRA adapters por checkpoint
+│   ├── lora-full/                 #   llama8b-onco (6 checkpoints, 640 MB c/u)
+│   └── gpt-oss-full/             #   gpt-oss-20b-onco (6 checkpoints, 3.5 GB c/u)
 ├── models/
-│   └── Llama8B-MedExpert-Oncologia/  # Modelo final fusionado
+│   └── Llama8B-MedExpert-Oncologia/  # Modelo fusionado (llama8b-onco)
 └── logs/                          # Logs de entrenamiento
 
 medexpert-admin/arena/
 ├── clinical_cases.json            # 15 casos clínicos con gold standard
-├── arena_runner.py                # Ejecuta 4 tiers × 15 casos
-├── arena_judge.py                 # Opus 4.6 califica 60 respuestas
+├── arena_runner.py                # Ejecuta 6 tiers × 15 casos
+├── arena_judge.py                 # Opus 4.6 califica 90 respuestas
 ├── arena_report.py                # Reportes + materiales para Forms
 └── results/                       # JSON/CSV con resultados
 ```
@@ -402,10 +447,11 @@ medexpert-admin/arena/
 | Muestreo de ChromaDB | ✅ Completado | $0 |
 | Generación de dataset (Sonnet 4.6) | ~43 horas | ~$132 USD |
 | Fine-tuning piloto (500 iters) | ~1 hora | $0 (local) |
-| Fine-tuning completo (3,000 iters) | ~18-28 horas | $0 (local) |
-| Fusión del modelo | ~10 minutos | $0 |
-| Arena: ejecución de candidatos (15×4) | ~1 hora | ~$2-5 USD (API tiers) |
-| Arena: evaluación Opus (60 juicios) | ~1 hora | ~$5-10 USD (Opus) |
+| Fine-tuning llama8b (3,000 iters) | ~11 horas | $0 (local) |
+| Fine-tuning gpt-oss-20b (3,000 iters) | ~8.5 horas | $0 (local) |
+| Fusión de modelos | ~20 minutos | $0 |
+| Arena v2: ejecución de candidatos (15×6) | ~1 hora | ~$3-6 USD (API tiers) |
+| Arena v2: evaluación Opus (90 juicios) | ~1.5 horas | ~$8-15 USD (Opus) |
 | Evaluación humana (3-5 doctores) | ~1 semana (asíncrono) | $0 |
 | Análisis y reporte final | ~2-4 horas | $0 |
-| **Total** | ~3-4 días + 1 semana humanos | ~$140-150 USD |
+| **Total** | ~4-5 días + 1 semana humanos | ~$145-165 USD |
