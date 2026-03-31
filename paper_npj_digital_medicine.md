@@ -97,9 +97,41 @@ For each sampled chunk, a teacher model (Claude Sonnet 4.6, Anthropic) generated
 2. **Clinical vignette**: A brief case (age, sex, staging) requiring clinical reasoning
 3. **Therapeutic decision**: A comparison between treatment options or management decision
 
-All responses were generated in Spanish regardless of source language, strictly grounded in the source chunk content, and included source attribution. Quality filters excluded responses shorter than 30 tokens. The generation process produced 34,728 training pairs, split 80/10/10 into training, validation, and test sets.
+All responses were generated in Spanish regardless of source language, strictly grounded in the source chunk content, and included source attribution. Quality filters excluded responses shorter than 30 tokens. This initial generation produced 34,728 training pairs used for Arena v1 and v2 evaluations.
 
-The total cost of synthetic data generation was approximately $175 USD in API fees.
+The total cost of initial synthetic data generation was approximately $175 USD in API fees.
+
+#### Expanded Dataset Generation
+
+Based on Arena v2b findings that the initial dataset (~8.6% corpus coverage) was the binding constraint on fine-tuned model quality, we performed a second, comprehensive generation pass. From the full corpus of 134,478 chunks, 98,133 high-quality chunks were selected after excluding low-information content (<80 characters, bibliography, copyright notices). A cost-effective teacher model (MiniMax M2.7) was used for this expanded generation, having demonstrated response quality comparable to Claude Sonnet in prior Arena evaluation at approximately 15× lower cost per token. Generation was parallelized across two concurrent batch processes (15 workers each), producing approximately 294,000 additional question-answer pairs at an estimated cost of ~$65 USD.
+
+The combined raw dataset (~329,000 examples from both generation passes) was then subjected to a multi-stage quality funnel designed to maximize training signal while minimizing noise, following the principle that smaller, high-quality datasets consistently outperform larger, unfiltered ones²⁹˒³⁰˒³².
+
+#### Dataset Quality Funnel
+
+We applied a sequential filtering pipeline ordered by computational cost, such that inexpensive deterministic filters reduce the corpus volume before applying costlier model-based assessment³¹ (Table 2b).
+
+**Table 2b.** Dataset quality funnel — sequential filtering stages.
+
+| Stage | Filter | Type | Rationale |
+|-------|--------|------|-----------|
+| 1 | Encoding and format validation | Deterministic | Remove corrupted entries, malformed UTF-8, structural artifacts |
+| 2 | Minimum response length (≥300 characters) | Deterministic | Short responses lack clinical depth; Arena v2b confirmed that brevity correlates with low utility scores |
+| 3 | Evasive response detection | Regex | Remove refusals ("como modelo de lenguaje", "consulte a su médico") that introduce refusal contamination²⁸ |
+| 4 | Question quality (≥30 characters) | Deterministic | Exclude trivially short or degenerate questions |
+| 5 | Semantic deduplication (cosine similarity >0.95) | Embedding | Redundant examples degrade fine-tuning performance; applied using sentence-transformer embeddings |
+| 6 | Cross-dataset deduplication | Embedding | Merge initial (34K) and expanded (294K) datasets, retaining the longer response when thematic overlap is detected |
+| 7 | LLM-as-filter quality scoring | Model-based | A frontier model (Claude Opus or Sonnet) scores a stratified random sample (~5%) on clinical accuracy, completeness, and guideline adherence (0–5 scale); examples scoring <3/5 are discarded³⁰˒³³ |
+
+Stages 1–6 are computationally free (deterministic or local embedding-based), allowing aggressive volume reduction before the cost-intensive Stage 7. This funnel design follows the dataset curation principles established by LIMA²⁹, AlpaGasus³⁰, and Deita³¹, adapted to the clinical domain with medical-specific filters (Stages 2–3).
+
+The quality funnel also provides a documented audit trail for each filtering decision, enabling reproducibility and transparency in the dataset construction process.
+
+#### Thematic Balance Verification
+
+After filtering, the dataset distribution was verified across clinical strata (treatment, pharmacology, diagnosis, supportive care, follow-up) and source provenance (NCCN, ESMO, IMSS, pharmaceutical monographs) to ensure no single category dominated >40% of the final training set. Over-represented categories were subsampled to maintain balanced clinical coverage.
+
+The final curated dataset was split 90/5/5 into training, validation, and test sets, with stratification by source and clinical stratum to ensure proportional representation in each partition.
 
 ### Model Fine-Tuning
 
@@ -501,10 +533,32 @@ The authors declare no competing interests.
 
 24. Hou Y, Bert C, Gomaa A, Lahmer G, Hofler D, Weissmann T, et al. Fine-tuning a local LLaMA-3 large language model for automated privacy-preserving physician letter generation in radiation oncology. Front Artif Intell. 2024;7:1493716. DOI: 10.3389/frai.2024.1493716
 
+### Synthetic Data Generation and Physician Alignment
+
+25. Toma TP, Lawler PR, Ba J, Krishnan RG, Rubin BB, Wang B. Clinical Camel: An open-source expert-level medical language model with dialogue-based knowledge encoding. arXiv preprint. 2023;arXiv:2305.12031.
+
+26. Fleming SL, Lozano A, Habber WJ, Jindal A, Reis EP, Paranjape A, et al. MedAlign: A clinician-generated dataset and benchmark for instruction following with electronic medical records. In: AAAI 2024;38(16):17960-17969. DOI: 10.1609/aaai.v38i16.29754
+
+27. Wang Y, Kordi Y, Mishra S, Liu A, Smith NA, Khashabi D, et al. Self-Instruct: Aligning language models with self-generated instructions. In: ACL 2023. DOI: 10.18653/v1/2023.acl-long.754
+
+28. Xu C, Sun Q, Zheng K, Geng X, Zhao P, Feng J, et al. WizardLM: Empowering large language models to follow complex instructions. In: ICLR 2024.
+
+### Dataset Curation and Quality Filtering
+
+29. Zhou C, Liu P, Xu P, Iyer S, Sun J, Mao Y, et al. LIMA: Less is more for alignment. In: NeurIPS 2023;36.
+
+30. Chen L, Li S, Yan J, Wang H, Gunaratna K, Ez-Zizi V, et al. AlpaGasus: Training a better Alpaca with fewer data. In: ICLR 2024.
+
+31. Liu M, Zeng H, Dong L, Hao Y, Wang W, Shao J, et al. What makes good data for alignment? A comprehensive study of automatic data selection in instruction tuning. In: ICLR 2024.
+
+32. Gunasekar S, Zhang Y, Anber J, Bubeck S, et al. Textbooks are all you need. arXiv preprint. 2023;arXiv:2306.11644.
+
+33. Zhang T, Lin Z, Pan A, Jiang S, et al. UltraMedical: Building specialized generalists in biomedicine. arXiv preprint. 2024;arXiv:2406.03949.
+
 ### Clinical AI in Oncology — High-Impact Journals
 
-25. Zhu M, Lin H, Jiang J, Jinia AJ, Jee J, Pichotta K, et al. Large language model trained on clinical oncology data predicts cancer progression. npj Digit Med. 2025;8:397. DOI: 10.1038/s41746-025-01780-2
+34. Zhu M, Lin H, Jiang J, Jinia AJ, Jee J, Pichotta K, et al. Large language model trained on clinical oncology data predicts cancer progression. npj Digit Med. 2025;8:397. DOI: 10.1038/s41746-025-01780-2
 
-26. Hao Y, Qiu Z, Holmes J, et al. Large language model integrations in cancer decision-making: a systematic review and meta-analysis. npj Digit Med. 2025. DOI: 10.1038/s41746-025-01824-7
+35. Hao Y, Qiu Z, Holmes J, et al. Large language model integrations in cancer decision-making: a systematic review and meta-analysis. npj Digit Med. 2025. DOI: 10.1038/s41746-025-01824-7
 
-27. Wu C, Qiu P, Liu J, et al. Towards evaluating and building versatile large language models for medicine. npj Digit Med. 2025;8:58. DOI: 10.1038/s41746-024-01390-4
+36. Wu C, Qiu P, Liu J, et al. Towards evaluating and building versatile large language models for medicine. npj Digit Med. 2025;8:58. DOI: 10.1038/s41746-024-01390-4

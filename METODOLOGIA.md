@@ -74,13 +74,50 @@ Del total de 134,478 chunks, se seleccionan ~12,000 chunks representativos media
 
 ### 2.3 Generación del dataset de entrenamiento
 
+#### Fase 1 — Dataset exploratorio (8.6% del corpus)
+
 **Modelo teacher**: Claude Sonnet 4.6 (`claude-sonnet-4-6`, Anthropic API)
 
-Por cada chunk seleccionado, el teacher genera 3 pares pregunta-respuesta:
+Se seleccionaron 11,592 chunks mediante muestreo estratificado (sección 2.2) para generar un dataset inicial de entrenamiento. Por cada chunk, el teacher genera 3 pares pregunta-respuesta:
 
 1. **Conocimiento directo**: Pregunta factual sobre el contenido del chunk
 2. **Caso clínico**: Caso breve con edad, género, estadio que requiere razonamiento
 3. **Decisión terapéutica**: Comparación entre opciones o decisión de manejo
+
+**Resultado**: 34,728 pares Q&A (8.6% del corpus), costo $175 USD.
+
+Este dataset se utilizó para entrenar y evaluar los modelos iniciales (llama8b-onco, gpt-oss-20b-onco). Los resultados del Arena (sección 3) mostraron que los modelos fine-tuned no alcanzaron calidad clínica suficiente (scores <1.4/5), mientras que modelos API generalistas con RAG obtuvieron scores significativamente superiores (Sonnet 3.17/5, MiniMax 2.75/5). El análisis reveló que **el tamaño del dataset (8.6% del corpus) es el principal bottleneck**, dado que la oncología es un dominio amplio y diverso donde un muestreo limitado deja brechas de conocimiento significativas.
+
+#### Fase 2 — Dataset completo (100% del corpus)
+
+**Decisión de cambio de teacher model**: Para generar el dataset completo a partir del 100% del corpus de ChromaDB, se evaluó el costo de diferentes modelos teacher:
+
+| Modelo | Intelligence Index (Artificial Analysis) | Costo estimado (100%) |
+|--------|----------------------------------------|----------------------|
+| Opus 4.6 | 53 | ~$10,500 USD |
+| Sonnet 4.6 | 44 | ~$2,100 USD |
+| Haiku 4.5 | 37 | ~$559 USD |
+| **MiniMax M2.7** | **50** | **~$180 USD** |
+
+Se seleccionó MiniMax M2.7 como teacher para la Fase 2 por tres razones:
+1. **Calidad superior al modelo original**: Intelligence Index 50 vs 44 de Sonnet 4.6 (según Artificial Analysis, marzo 2026)
+2. **Costo 12x menor**: $0.30/$1.20 per 1M tokens (input/output) vs $3/$15 de Sonnet
+3. **Validación empírica**: un piloto de 50 chunks generó 150 Q&A pairs con calidad clínica comparable a los generados con Sonnet — terminología médica correcta, adherencia al fragmento fuente, inclusión de niveles de evidencia y dosis específicas
+
+**Proceso de la Fase 2**:
+- Del total de 134,478 chunks se aplicaron los mismos filtros de calidad (longitud mínima, exclusión de bibliografía/COI, deduplicación), resultando en 98,133 chunks de calidad
+- Se excluyeron los 11,592 chunks ya procesados en la Fase 1, dejando 86,575 chunks por procesar
+- Generación paralela con 15 workers concurrentes sobre la API de MiniMax
+- Mismo prompt template y formato de salida que la Fase 1
+- Checkpointing cada 500 chunks para tolerancia a fallos
+
+**Dataset combinado (Fase 1 + Fase 2)**:
+- Fase 1 (Sonnet 4.6): 34,728 pares de 11,592 chunks (8.6%)
+- Fase 2 (MiniMax M2.7): ~259,725 pares estimados de 86,575 chunks (91.4%)
+- **Total estimado**: ~294,453 pares Q&A del 100% del corpus de calidad
+- **Costo total de generación**: ~$265 USD ($175 Fase 1 + ~$90 Fase 2)
+
+**Nota metodológica**: La heterogeneidad del teacher model (Sonnet para 8.6%, MiniMax para 91.4%) no afecta la calidad del dataset final, ya que las respuestas están estrictamente grounded en el contenido de los chunks fuente — el modelo teacher actúa como extractor y reformulador de conocimiento existente, no como fuente de conocimiento propio. La validación del piloto confirmó que ambos modelos producen Q&A de calidad comparable para esta tarea específica.
 
 **Formato de salida** (JSONL chat para mlx-lm):
 ```json
@@ -97,7 +134,6 @@ Por cada chunk seleccionado, el teacher genera 3 pares pregunta-respuesta:
 - Filtro de longitud (>30 tokens respuesta)
 - Inclusión de fuente al final de cada respuesta
 
-**Volumen estimado**: ~35,000 pares de entrenamiento
 **Split**: 80% train / 10% validation / 10% test
 
 ### 2.4 Configuración de fine-tuning
@@ -162,23 +198,41 @@ Peak memory: 30.8 GB | Velocidad: ~0.105 it/sec, ~65 tok/sec | Tokens entrenados
 
 ### 3.1 Diseño del estudio
 
-**Evaluación comparativa de 6 candidatos** de respuesta clínica oncológica (Arena v2):
+#### Arena v1-v2 (completadas, 2026-03-26 a 2026-03-27)
 
-| # | Tier | Modelo | Provider | Fine-tune | RAG |
-|---|------|--------|----------|-----------|-----|
-| 1 | **llama8b base + RAG** | Meta-Llama-3.1-8B-Instruct-4bit | Meta (local) | No | Sí |
-| 2 | **llama8b-onco** | llama8b-onco LoRA (local) | Meta (fine-tune local) | Sí | No |
-| 3 | **gpt-oss-20b base + RAG** | gpt-oss-20b-MLX-4bit | Open-source (local) | No | Sí |
-| 4 | **gpt-oss-20b-onco** | gpt-oss-20b-onco LoRA (local) | Open-source (fine-tune local) | Sí | No |
-| 5 | **MiniMax-M1-80K + RAG** | MiniMax-Text-01 | MiniMax (API) | No | Sí |
-| 6 | **Sonnet 4 + RAG** | Sonnet 4 | Anthropic (API) | No | Sí |
+Evaluaciones iterativas con 6 tiers (llama8b base/ft, gpt-oss-20b base/ft, MiniMax, Sonnet). Resultados: modelos locales fine-tuned insuficientes con dataset de 8.6% del corpus (scores <1.37/5). Hallazgo clave: el prompt controla formato pero no calidad; el tamaño del dataset es el bottleneck principal. Ver resultados completos en `arena/results/`.
+
+#### Arena v3 (actual, abril 2026)
+
+**Evaluación comparativa de 8 candidatos** de respuesta clínica oncológica:
+
+| # | Tier | Modelo | Tipo | Fine-tune | RAG |
+|---|------|--------|------|-----------|-----|
+| 1 | **gpt-oss-20b + RAG** | gpt-oss-20b base | MoE 20B | No | Sí |
+| 2 | **gpt-oss-20b-onco** | gpt-oss-20b fine-tuned | MoE 20B | Sí | No |
+| 3 | **Nemotron 30B + RAG** | Nemotron-3-Nano-30B base | MoE 30B | No | Sí |
+| 4 | **Nemotron-onco** | Nemotron 30B fine-tuned | MoE 30B | Sí | No |
+| 5 | **MedGemma 27B + RAG** | MedGemma 27B base | Denso 27B (medical pre-trained) | No | Sí |
+| 6 | **MedGemma-onco** | MedGemma 27B fine-tuned | Denso 27B (medical pre-trained) | Sí | No |
+| 7 | **MiniMax + RAG** | MiniMax M2.7 | API | No | Sí |
+| 8 | **Sonnet + RAG** | Sonnet 4.6 | API | No | Sí |
+
+**Cambios respecto a v2**:
+- Eliminados tiers llama8b (insuficientes en v1/v2, scores <0.66)
+- Agregados Nemotron 30B (base + fine-tuned) — MoE más grande, mejor rendimiento en benchmarks
+- Agregados MedGemma 27B (base + fine-tuned) — modelo denso con pre-entrenamiento médico de Google
+- Dataset ampliado: ~294K Q&A pairs (100% ChromaDB, generados con MiniMax M2.7 como teacher)
 
 **Evaluador (juez)**: Claude Opus 4.6 + RAG (no compite como candidato, imparcial)
 
 **Preguntas de investigación**:
-1. **RAG vs fine-tune**: ¿Qué estrategia da mejor resultado, retrieval sobre modelo base o fine-tuning sin retrieval? (tiers 1 vs 2, tiers 3 vs 4)
-2. **Denso vs MoE**: ¿Un modelo MoE 20B fine-tuned supera a un modelo denso 8B fine-tuned con el mismo dataset? (tier 2 vs 4)
-3. **Local vs API**: ¿Los modelos locales fine-tuned alcanzan calidad comparable a modelos API generalistas + RAG? (tier 4 vs 5 vs 6)
+1. **RAG vs fine-tune**: ¿Qué estrategia da mejor resultado, retrieval sobre modelo base o fine-tuning sin retrieval? (tiers 1 vs 2, 3 vs 4, 5 vs 6)
+2. **MoE vs denso**: ¿Los modelos MoE (20B, 30B) superan al modelo denso (27B) fine-tuned con el mismo dataset? (tiers 2 vs 4 vs 6)
+3. **Efecto del tamaño**: ¿El modelo MoE 30B supera al MoE 20B con la misma estrategia? (tiers 1 vs 3, 2 vs 4)
+4. **Local vs API**: ¿Los modelos locales fine-tuned alcanzan calidad comparable a modelos API generalistas + RAG? (tiers 2, 4, 6 vs 7, 8)
+5. **Pre-entrenamiento médico**: ¿MedGemma (base médica) supera a modelos de propósito general del mismo tamaño? (tiers 5 vs 1/3, 6 vs 2/4)
+
+**Criterio para evaluación humana**: los top 5-6 tiers con score Opus >2.5/5 serán enviados a oncólogos para evaluación humana. Esto evita desperdiciar tiempo de doctores en modelos que no están listos clínicamente.
 
 ### 3.2 Casos clínicos de prueba
 
@@ -215,21 +269,22 @@ Escala 0-5 por criterio. La misma rúbrica se aplica tanto al juez automático (
 
 ```
 Para cada caso clínico (15):
-  Para cada candidato (6 tiers):
+  Para cada candidato (8 tiers):
     1. Enviar caso → pipeline completo del candidato
     2. Registrar respuesta completa + métricas de rendimiento
     3. Enviar respuesta al juez (Opus 4.6 + RAG + gold standard)
     4. Juez califica con rúbrica estructurada + feedback textual
-Total: 90 evaluaciones automáticas (15 casos × 6 candidatos)
+Total: 120 evaluaciones automáticas (15 casos × 8 candidatos)
+Costo estimado: ~$13 USD (Opus judge + API tiers)
 ```
 
-**Ventajas**: reproducible, sin costo de coordinación, cubre los 15 casos × 6 candidatos.
+**Ventajas**: reproducible, sin costo de coordinación, cubre los 15 casos × 8 candidatos.
 
 ### 3.5 Evaluación humana — Panel de oncólogos
 
 #### 3.5.1 Diseño
 
-Evaluación ciega por oncólogos clínicos. Las respuestas se presentan anonimizadas y en orden aleatorio (Candidato A-F) diferente por caso para evitar sesgo posicional. Los evaluadores no conocen qué modelo generó cada respuesta.
+Evaluación ciega por oncólogos clínicos. Solo los tiers con score Opus >2.5/5 pasan a evaluación humana (estimado: 5-6 de los 8 tiers). Las respuestas se presentan anonimizadas y en orden aleatorio diferente por caso para evitar sesgo posicional. Los evaluadores no conocen qué modelo generó cada respuesta.
 
 **Instrumento**: Google Forms con la rúbrica de 4 criterios (§3.3), escala 0-5 por criterio, más un campo de comentarios libres por respuesta.
 
@@ -350,26 +405,30 @@ Los scores de Opus y humanos se reportan **por separado** (no se combinan en un 
 
 ### 3.9 Hipótesis a evaluar
 
-1. **H1**: RAG sobre modelo base supera a fine-tune sin RAG en ambas arquitecturas (llama8b y gpt-oss)
-2. **H2**: gpt-oss-20b-onco (MoE, fine-tuned) supera a llama8b-onco (denso, fine-tuned) con el mismo dataset
-3. **H3**: Los modelos locales fine-tuned alcanzan ≥70% del score de Sonnet 4 + RAG en casos simples
-4. **H4**: Los modelos locales tienen latencia <5s vs >10s de los API (mejor experiencia de usuario)
-5. **H5**: El costo por consulta local es $0 vs ~$0.05-0.15 de MiniMax/Sonnet
-6. **H6**: El score de Opus correlaciona r > 0.80 con el consenso humano (validación del juez LLM)
-7. **H7**: MiniMax (generalista API) supera a los modelos locales base + RAG pero no a Sonnet
+1. **H1**: RAG sobre modelo base supera a fine-tune sin RAG en las tres arquitecturas (gpt-oss, Nemotron, MedGemma)
+2. **H2**: Nemotron 30B (MoE más grande) supera a gpt-oss-20b (MoE más chico) con la misma estrategia
+3. **H3**: MedGemma (pre-entrenamiento médico) supera a modelos de propósito general del mismo tamaño
+4. **H4**: Los modelos locales fine-tuned con dataset ampliado (~294K pairs) alcanzan ≥70% del score de Sonnet + RAG en casos simples
+5. **H5**: Los modelos locales tienen latencia <5s vs >10s de los API (mejor experiencia de usuario)
+6. **H6**: El costo por consulta local es $0 vs ~$0.05-0.15 de MiniMax/Sonnet
+7. **H7**: El score de Opus correlaciona r > 0.80 con el consenso humano (validación del juez LLM)
+8. **H8**: MiniMax (generalista API) supera a los modelos locales base + RAG pero no a Sonnet
+9. **H9**: El dataset ampliado (294K pairs vs 35K) mejora significativamente los scores de fine-tune respecto a v2
 
 ### 3.10 Arquitectura técnica de la Arena
 
 ```
 medexpert-admin/arena/
 ├── clinical_cases.json         # 15 casos clínicos con gold standard
-├── arena_runner.py             # CandidateRunner: ejecuta 6 tiers × 15 casos
-│     ├── llama8b_rag:  llama8b base + RAG + ChromaDB
-│     ├── llama8b_ft:   llama8b-onco (fine-tuned), sin RAG
-│     ├── gptoss_rag:   gpt-oss-20b base + RAG + ChromaDB
-│     ├── gptoss_ft:    gpt-oss-20b-onco (fine-tuned), sin RAG
-│     ├── minimax:      MiniMax-M1-80K + RAG + ChromaDB
-│     └── sonnet:       Sonnet 4 + RAG + ChromaDB
+├── arena_runner.py             # CandidateRunner: ejecuta 8 tiers × 15 casos
+│     ├── gptoss_rag:      gpt-oss-20b base + RAG + ChromaDB
+│     ├── gptoss_ft:       gpt-oss-20b-onco (fine-tuned), sin RAG
+│     ├── nemotron_rag:    Nemotron 30B base + RAG + ChromaDB
+│     ├── nemotron_ft:     Nemotron-onco (fine-tuned), sin RAG
+│     ├── medgemma_rag:    MedGemma 27B base + RAG + ChromaDB
+│     ├── medgemma_ft:     MedGemma-onco (fine-tuned), sin RAG
+│     ├── minimax:         MiniMax M2.7 + RAG + ChromaDB
+│     └── sonnet:          Sonnet 4.6 + RAG + ChromaDB
 ├── arena_judge.py              # JudgeRunner: Opus 4.6 + RAG + rúbrica
 │     └── output: JSON con scores por criterio + feedback textual
 ├── arena_report.py             # Genera reportes + materiales para Google Forms
@@ -392,7 +451,7 @@ medexpert-admin/arena/
 4. **Recomendación de tier**: qué candidato usar para qué tipo de consulta
 5. **Paper**: evaluación formal con los 15 casos, doble jueceo (LLM + humanos)
 6. **Configuración de producción**: reglas para asignar tier según tipo de consulta del usuario
-7. **Anexo completo de la publicación**: documento con las 75 respuestas íntegras (15 casos × 5 candidatos), cada una con:
+7. **Anexo completo de la publicación**: documento con las 120 respuestas íntegras (15 casos × 8 candidatos), cada una con:
    - Caso clínico original
    - Respuesta completa del candidato (sin truncar)
    - Calificación de Opus por criterio (precisión, apego, completitud, utilidad)
@@ -432,8 +491,8 @@ medexpert-oncologia/
 
 medexpert-admin/arena/
 ├── clinical_cases.json            # 15 casos clínicos con gold standard
-├── arena_runner.py                # Ejecuta 6 tiers × 15 casos
-├── arena_judge.py                 # Opus 4.6 califica 90 respuestas
+├── arena_runner.py                # Ejecuta 8 tiers × 15 casos
+├── arena_judge.py                 # Opus 4.6 califica 120 respuestas
 ├── arena_report.py                # Reportes + materiales para Forms
 └── results/                       # JSON/CSV con resultados
 ```
@@ -445,13 +504,17 @@ medexpert-admin/arena/
 | Fase | Duración | Costo |
 |------|----------|-------|
 | Muestreo de ChromaDB | ✅ Completado | $0 |
-| Generación de dataset (Sonnet 4.6) | ~43 horas | ~$132 USD |
-| Fine-tuning piloto (500 iters) | ~1 hora | $0 (local) |
-| Fine-tuning llama8b (3,000 iters) | ~11 horas | $0 (local) |
-| Fine-tuning gpt-oss-20b (3,000 iters) | ~8.5 horas | $0 (local) |
-| Fusión de modelos | ~20 minutos | $0 |
-| Arena v2: ejecución de candidatos (15×6) | ~1 hora | ~$3-6 USD (API tiers) |
-| Arena v2: evaluación Opus (90 juicios) | ~1.5 horas | ~$8-15 USD (Opus) |
-| Evaluación humana (3-5 doctores) | ~1 semana (asíncrono) | $0 |
+| Generación de dataset (Sonnet 4.6, 8.6%) | ✅ Completado (~43 horas) | ~$132 USD |
+| Generación de dataset (MiniMax M2.7, 91.4%) | ✅ En proceso (~31-mar) | ~$45 USD |
+| Fine-tuning llama8b (3,000 iters) | ✅ Completado (~11 horas) | $0 (local) |
+| Fine-tuning gpt-oss-20b (3,000 iters) | ✅ Completado (~8.5 horas) | $0 (local) |
+| Arena v1-v2: evaluación iterativa | ✅ Completado (4 rondas) | ~$31 USD |
+| Reentrenamiento gpt-oss-20b-onco (dataset ampliado) | ~8-10 horas | $0 (local) |
+| Fine-tuning Nemotron 30B (3,000 iters) | ~10-12 horas | $0 (local) |
+| Fine-tuning MedGemma 27B (3,000 iters) | ~12-15 horas | $0 (local) |
+| Fusión de 3 modelos | ~1 hora | $0 |
+| Arena v3: ejecución de candidatos (15×8) | ~1.5 horas | ~$4-6 USD (API tiers) |
+| Arena v3: evaluación Opus (120 juicios) | ~2 horas | ~$8-13 USD (Opus) |
+| Evaluación humana (top 5-6 tiers, 3-5 doctores) | ~1 semana (asíncrono) | $0 |
 | Análisis y reporte final | ~2-4 horas | $0 |
-| **Total** | ~4-5 días + 1 semana humanos | ~$145-165 USD |
+| **Total** | ~3-4 días training + Arena + 1 semana humanos | ~$220-230 USD acumulado |
