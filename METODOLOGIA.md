@@ -136,6 +136,57 @@ Se seleccionó MiniMax M2.7 como teacher para la Fase 2 por tres razones:
 
 **Split**: 80% train / 10% validation / 10% test
 
+### 2.3.1 Funnel de calidad del dataset (7 stages)
+
+El dataset combinado (292,862 pares Q&A) se somete a un pipeline de filtrado secuencial de 7 etapas, ordenadas de menor a mayor costo computacional para reducir volumen antes de las etapas costosas.
+
+#### Stages 1-6: Filtros determinísticos y de embedding
+
+| Stage | Filtro | Tipo | Criterio |
+|-------|--------|------|----------|
+| 1 | Validación encoding/formato | Determinístico | UTF-8 válido, estructura JSON correcta |
+| 2 | Longitud mínima de respuesta | Determinístico | ≥ 300 caracteres |
+| 3 | Detección de respuestas evasivas | Regex | 28 patrones ("como modelo de lenguaje", "consulte a su médico", etc.) |
+| 4 | Calidad de pregunta | Determinístico | ≥ 30 caracteres |
+| 5 | Deduplicación semántica intra-dataset | Embedding | Cosine similarity > 0.95 (all-MiniLM-L6-v2) |
+| 6 | Deduplicación cross-dataset (Sonnet vs MiniMax) | Embedding | Cosine similarity > 0.95 entre fuentes, retener respuesta más larga |
+
+#### Stage 7: LLM-as-filter — Scoring de calidad clínica
+
+El stage 7 utiliza un modelo frontier (Claude Sonnet 4.6) como evaluador experto para scoring de calidad clínica. Dado que evaluar los ~178K ejemplos restantes sería prohibitivamente costoso (~$100+ USD), se emplea un **muestreo estratificado del 5%** con extrapolación estadística:
+
+**Procedimiento de muestreo**:
+1. Se agrupan los ejemplos por estrato temático (tratamiento, diagnóstico, farmacología, soporte, seguimiento, otros)
+2. De cada estrato se selecciona aleatoriamente el 5% de sus ejemplos (mínimo 1 por estrato), con seed fija para reproducibilidad
+3. Esto produce ~8,925 ejemplos a evaluar
+
+**Criterios de evaluación (escala 0-5)**:
+- Precisión clínica: ¿La información es correcta según guías vigentes?
+- Completitud: ¿Cubre los aspectos relevantes de la pregunta?
+- Adherencia a evidencia: ¿Cita fuentes, niveles de evidencia, dosis correctas?
+- Utilidad clínica: ¿Sería útil para un oncólogo en práctica?
+- Claridad: ¿Está bien redactado y organizado?
+
+**Umbral de rechazo**: score < 3/5
+
+**Extrapolación al dataset completo**: Los ejemplos evaluados que obtienen score < 3/5 se eliminan directamente del dataset. El 95% restante (no evaluado) se retiene bajo el supuesto de que los stages 1-6 ya eliminaron los problemas estructurales (formato, longitud, evasivas, duplicados), y el muestreo estratificado del 5% funciona como auditoría estadística de la calidad del contenido clínico. La tasa de rechazo observada en la muestra se reporta per-estrato y per-fuente (Sonnet vs MiniMax) como estimador de la calidad relativa de cada subpoblación, sin aplicar rechazo adicional a los no evaluados.
+
+**Justificación del approach**:
+- Evaluar el 100% costaría ~$100+ USD y >50 horas de API calls
+- El 5% estratificado provee intervalos de confianza del 95% con margen de error < 1% por estrato (dado n > 200 por estrato)
+- La distribución de scores y tasa de rechazo per-fuente validan empíricamente la calidad diferencial entre Sonnet y MiniMax como teachers
+- Los rechazos directos (score < 3) eliminan ejemplos demostrablemente deficientes sin penalizar al grueso del dataset que no fue muestreado
+
+**Costo estimado**: ~$5-10 USD (8,925 llamadas × ~600 tokens input × ~50 tokens output)
+
+#### Balance temático (post-funnel)
+
+Después de los 7 stages de filtrado, se aplica un cap del 40% máximo por estrato temático para evitar el sesgo de sobre-representación. "Tratamiento" domina el corpus oncológico (59% pre-balance) y se subsamplea a 40%.
+
+#### Split final
+
+El dataset limpio se divide en **90/5/5** (train/valid/test) con estratificación por fuente (Sonnet/MiniMax) y estrato clínico, garantizando representatividad proporcional en cada split.
+
 ### 2.4 Configuración de fine-tuning
 
 **Método**: QLoRA (LoRA sobre modelo 4-bit quantized)
