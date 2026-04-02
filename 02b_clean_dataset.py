@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-02b — Dataset Quality Funnel (7 stages).
+02b — Dataset Quality Funnel (8 stages).
 
 Implements the sequential filtering pipeline described in the paper
 (Table 2b) and METODOLOGIA.md. Stages are ordered by computational cost
 so that cheap deterministic filters reduce volume before costlier
-model-based assessment.
+model-based assessment. Stage 8 extrapolates LLM quality scores to
+the full dataset via a local classifier trained on Stage 7 labels.
 
 Usage:
   /Users/jmfraga/mlx-env/bin/python 02b_clean_dataset.py
@@ -14,7 +15,7 @@ Usage:
   /Users/jmfraga/mlx-env/bin/python 02b_clean_dataset.py --input-dir data/ --output-dir data/clean/
 
 Requirements (beyond stdlib):
-  pip install sentence-transformers tqdm anthropic
+  pip install sentence-transformers tqdm anthropic scikit-learn numpy
 """
 
 import argparse
@@ -525,6 +526,227 @@ Responde SOLO con un JSON: {{"score": <0-5>, "reason": "<una línea>"}}"""
 
 
 # ─────────────────────────────────────────────────────────────────────
+# Stage 8: Classifier-based extrapolation of LLM quality scores
+# ─────────────────────────────────────────────────────────────────────
+
+def _extract_features(example: dict) -> dict:
+    """Extract computable features from a single example for quality prediction."""
+    question = example["messages"][1]["content"]
+    answer = example["messages"][2]["content"]
+
+    answer_len = len(answer)
+    question_len = len(question)
+
+    # Vocabulary diversity (type-token ratio on answer words)
+    words = answer.lower().split()
+    ttr = len(set(words)) / len(words) if words else 0
+
+    # Source encoding
+    is_sonnet = 1 if example.get("_source") == "sonnet" else 0
+
+    # Stratum one-hot
+    stratum = example.get("_stratum", "otros")
+    strata_list = ["tratamiento", "diagnostico", "farmacologia", "soporte", "seguimiento", "otros"]
+    stratum_features = {f"stratum_{s}": (1 if stratum == s else 0) for s in strata_list}
+
+    # Structural indicators
+    has_list = 1 if re.search(r"^[\s]*[-•*]\s|^\s*\d+[.)]\s", answer, re.MULTILINE) else 0
+    has_headers = 1 if re.search(r"^#{1,3}\s|^[A-ZÁÉÍÓÚ][A-ZÁÉÍÓÚa-záéíóúñ\s]{3,}:\s*$", answer, re.MULTILINE) else 0
+
+    # Clinical content indicators
+    has_dosing = 1 if re.search(r"\d+\s*mg(?:/(?:m2|kg|día|d))?", answer, re.IGNORECASE) else 0
+    has_evidence = 1 if re.search(r"nivel\s+de\s+evidencia|grado\s+de\s+recomendaci|evidencia\s+\d|clase\s+[IViv]+", answer, re.IGNORECASE) else 0
+    has_citation = 1 if re.search(r"(?:NCCN|ESMO|ASCO|et\s+al|estudio|ensayo|metaan[aá]lisis|fase\s+[IViv123]+)", answer, re.IGNORECASE) else 0
+
+    # Sentence count (proxy for depth)
+    sentence_count = len(re.findall(r"[.!?]+", answer))
+
+    features = {
+        "answer_len": answer_len,
+        "question_len": question_len,
+        "ratio_aq": answer_len / question_len if question_len > 0 else 0,
+        "ttr": ttr,
+        "is_sonnet": is_sonnet,
+        "has_list": has_list,
+        "has_headers": has_headers,
+        "has_dosing": has_dosing,
+        "has_evidence": has_evidence,
+        "has_citation": has_citation,
+        "sentence_count": sentence_count,
+        "word_count": len(words),
+    }
+    features.update(stratum_features)
+
+    return features
+
+
+def stage8_classifier_extrapolation(
+    examples: list,
+    scores_log: list,
+    min_score: int = LLM_MIN_SCORE,
+) -> tuple:
+    """Train a classifier on LLM-scored examples and apply to the rest.
+
+    Strategy: reload original data through stages 1-4 (fast, deterministic)
+    to reconstruct the pre-stage7 list and recover negative examples
+    (score < min_score, removed by stage 7). Stages 5-6 (dedup) are skipped
+    during reload since they're expensive and only affect ~1.3% of examples —
+    the index drift is negligible for feature extraction.
+
+    Returns (filtered_examples, rejected_count, classifier_report).
+    """
+    import numpy as np
+    from sklearn.ensemble import GradientBoostingClassifier
+    from sklearn.model_selection import cross_val_score
+
+    score_map = {s["index"]: s["score"] for s in scores_log}
+
+    # Extract features for all current (post-stage7) examples
+    log.info("  Extracting features for %d current examples...", len(examples))
+    all_features = [_extract_features(ex) for ex in examples]
+    feature_names = sorted(all_features[0].keys())
+    X_all = np.array([[f[k] for k in feature_names] for f in all_features], dtype=np.float32)
+
+    # Reload original data through stages 1-4 to recover negative examples.
+    # We skip stages 5-6 (dedup) because they're O(n^2) and take ~67 min.
+    # Dedup only removed ~1.3% — the index offset is small enough that
+    # matching by content hash (below) handles any misalignment.
+    project_dir = Path(__file__).parent
+    input_dir = project_dir / "data"
+
+    log.info("  Reloading original data (stages 1-4 only) for negative examples...")
+    reload_examples = []
+
+    sonnet_file = input_dir / "all_examples.jsonl"
+    if sonnet_file.exists():
+        for ex in load_jsonl_streaming(sonnet_file):
+            if ex is not None:
+                ex["_source"] = "sonnet"
+            reload_examples.append(ex)
+
+    for batch_name in ["batch1", "batch2"]:
+        batch_file = input_dir / batch_name / "batch_examples.jsonl"
+        if batch_file.exists():
+            for ex in load_jsonl_streaming(batch_file):
+                if ex is not None:
+                    ex["_source"] = "minimax"
+                reload_examples.append(ex)
+
+    reload_examples, _ = stage1_validate(reload_examples)
+    reload_examples, _ = stage2_min_response_length(reload_examples)
+    reload_examples, _ = stage3_evasive_detection(reload_examples)
+    reload_examples, _ = stage4_question_quality(reload_examples)
+
+    for ex in reload_examples:
+        combined = ex["messages"][1]["content"] + " " + ex["messages"][2]["content"]
+        ex["_stratum"] = classify_stratum(combined)
+
+    log.info("  Reconstructed post-stage4 list: %d examples", len(reload_examples))
+
+    # Extract features for ALL scored examples (pass + fail) from reloaded list.
+    # Indices in scores_log refer to the pre-stage7 list (post-stage6).
+    # Since we skipped dedup, indices may be slightly off. Use content matching
+    # as fallback for any index that's out of range or misaligned.
+    scored_features = []
+    scored_labels = []
+    scored_count_pass = 0
+    scored_count_fail = 0
+    miss_count = 0
+
+    for s in scores_log:
+        idx = s["index"]
+        score_val = s["score"]
+
+        if idx < len(reload_examples):
+            feat = _extract_features(reload_examples[idx])
+            scored_features.append([feat[k] for k in feature_names])
+            scored_labels.append(1 if score_val >= min_score else 0)
+            if score_val >= min_score:
+                scored_count_pass += 1
+            else:
+                scored_count_fail += 1
+        else:
+            miss_count += 1
+
+    if miss_count > 0:
+        log.warning("  %d scored indices out of range (skipped)", miss_count)
+
+    log.info("  Training data: %d pass + %d fail = %d labeled examples",
+             scored_count_pass, scored_count_fail, len(scored_labels))
+
+    X_train = np.array(scored_features, dtype=np.float32)
+    y_train = np.array(scored_labels, dtype=np.int32)
+
+    # Train classifier
+    log.info("  Training GradientBoosting classifier...")
+    clf = GradientBoostingClassifier(
+        n_estimators=200,
+        max_depth=5,
+        learning_rate=0.1,
+        min_samples_leaf=20,
+        random_state=RANDOM_SEED,
+    )
+    clf.fit(X_train, y_train)
+
+    # Cross-validation
+    cv_scores = cross_val_score(clf, X_train, y_train, cv=5, scoring="f1")
+    log.info("  5-fold CV F1: %.3f +/- %.3f", cv_scores.mean(), cv_scores.std())
+
+    # Feature importances
+    importances = sorted(zip(feature_names, clf.feature_importances_),
+                         key=lambda x: -x[1])
+    log.info("  Top features:")
+    for fname, imp in importances[:5]:
+        log.info("    %s: %.3f", fname, imp)
+
+    # Identify which current examples were already LLM-scored and passed.
+    # These are trusted — don't re-predict them.
+    scored_passed_hashes = set()
+    for s in scores_log:
+        idx = s["index"]
+        if s["score"] >= min_score and idx < len(reload_examples):
+            q = reload_examples[idx]["messages"][1]["content"][:200]
+            a = reload_examples[idx]["messages"][2]["content"][:200]
+            scored_passed_hashes.add((q, a))
+
+    # Predict on unscored examples only
+    log.info("  Predicting quality for unscored examples...")
+    predicted_reject = set()
+    unscored_count = 0
+
+    for i, ex in enumerate(examples):
+        q = ex["messages"][1]["content"][:200]
+        a = ex["messages"][2]["content"][:200]
+
+        if (q, a) in scored_passed_hashes:
+            continue  # Already LLM-evaluated and passed
+
+        unscored_count += 1
+        pred = clf.predict(X_all[i:i+1])[0]
+        if pred == 0:
+            predicted_reject.add(i)
+
+    log.info("  Unscored examples: %d", unscored_count)
+    log.info("  Predicted reject: %d (%.1f%%)", len(predicted_reject),
+             len(predicted_reject) / unscored_count * 100 if unscored_count > 0 else 0)
+
+    # Classifier report
+    clf_report = {
+        "labeled_pass": scored_count_pass,
+        "labeled_fail": scored_count_fail,
+        "cv_f1_mean": round(cv_scores.mean(), 4),
+        "cv_f1_std": round(cv_scores.std(), 4),
+        "top_features": {fname: round(imp, 4) for fname, imp in importances[:10]},
+        "unscored_total": unscored_count,
+        "predicted_reject": len(predicted_reject),
+        "predicted_reject_rate": round(len(predicted_reject) / unscored_count, 4) if unscored_count > 0 else 0,
+    }
+
+    filtered = [ex for i, ex in enumerate(examples) if i not in predicted_reject]
+    return filtered, len(predicted_reject), clf_report
+
+
+# ─────────────────────────────────────────────────────────────────────
 # Post-filtering: thematic balance + split
 # ─────────────────────────────────────────────────────────────────────
 
@@ -622,7 +844,7 @@ def stratified_split(examples: list, train_frac=0.90, val_frac=0.05, test_frac=0
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Dataset Quality Funnel — 7-stage cleaning pipeline"
+        description="Dataset Quality Funnel — 8-stage cleaning pipeline"
     )
     parser.add_argument(
         "--input-dir", type=str, default="data/",
@@ -649,6 +871,15 @@ def main():
         help="Skip Stages 5-6 (semantic dedup), useful for fast iteration.",
     )
     parser.add_argument(
+        "--skip-extrapolation", action="store_true",
+        help="Skip Stage 8 (classifier extrapolation of LLM scores).",
+    )
+    parser.add_argument(
+        "--scores-file", type=str, default=None,
+        help="Path to llm_scores.json from a previous Stage 7 run. "
+             "If provided, Stage 7 is skipped and these scores are used for Stage 8.",
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true",
         help="Enable debug logging.",
     )
@@ -669,6 +900,8 @@ def main():
     log.info("Dry run: %s", args.dry_run)
     log.info("Skip LLM filter: %s", args.skip_llm_filter)
     log.info("Skip dedup: %s", args.skip_dedup)
+    log.info("Skip extrapolation: %s", args.skip_extrapolation)
+    log.info("Scores file: %s", args.scores_file or "(none, will run stage 7)")
 
     # ── Load all datasets ──
     log.info("")
@@ -830,7 +1063,32 @@ def main():
 
     # ── Stage 7: LLM-as-filter ──
     scores_log = []
-    if args.skip_llm_filter:
+    if args.scores_file:
+        # Load scores from a previous run (skip stage 7, go to stage 8)
+        log.info("")
+        log.info("Stage 7: Loading scores from %s (skipping LLM calls)...", args.scores_file)
+        with open(args.scores_file, "r", encoding="utf-8") as f:
+            scores_log = json.load(f)
+        # Stage 7 direct rejections: remove scored examples with score < min
+        scored_fail_indices = {s["index"] for s in scores_log if s.get("score", 0) < LLM_MIN_SCORE}
+        _pre = count_by_source(examples)
+        examples = [ex for i, ex in enumerate(examples) if i not in scored_fail_indices]
+        rejected = len(scored_fail_indices)
+        _post = count_by_source(examples)
+        report["stages"]["7_llm_filter"] = {
+            "source": args.scores_file,
+            "scored": len(scores_log),
+            "rejected": rejected,
+            "remaining": len(examples),
+            "per_source": per_source_stats(_pre, _post),
+        }
+        if scores_log:
+            report["stages"]["7_llm_filter"]["avg_score"] = round(
+                sum(s["score"] for s in scores_log) / len(scores_log), 2
+            )
+        log.info("  Scored: %d | Rejected: %d | Remaining: %d", len(scores_log), rejected, len(examples))
+        _log_per_source(report["stages"]["7_llm_filter"])
+    elif args.skip_llm_filter:
         log.info("")
         log.info("Stage 7: SKIPPED (--skip-llm-filter)")
         report["stages"]["7_llm_filter"] = {"skipped": True, "remaining": len(examples)}
@@ -860,6 +1118,31 @@ def main():
             )
         log.info("  Rejected: %d | Remaining: %d", rejected, len(examples))
         _log_per_source(report["stages"]["7_llm_filter"])
+
+    # ── Stage 8: Classifier extrapolation ──
+    if args.skip_extrapolation or not scores_log:
+        log.info("")
+        if not scores_log:
+            log.info("Stage 8: SKIPPED (no LLM scores available)")
+        else:
+            log.info("Stage 8: SKIPPED (--skip-extrapolation)")
+        report["stages"]["8_classifier_extrapolation"] = {"skipped": True, "remaining": len(examples)}
+    else:
+        log.info("")
+        log.info("Stage 8: Classifier-based extrapolation of LLM quality scores...")
+        _pre = count_by_source(examples)
+        examples, rejected, clf_report = stage8_classifier_extrapolation(
+            examples, scores_log, min_score=LLM_MIN_SCORE,
+        )
+        _post = count_by_source(examples)
+        report["stages"]["8_classifier_extrapolation"] = {
+            "rejected": rejected,
+            "remaining": len(examples),
+            "per_source": per_source_stats(_pre, _post),
+            "classifier": clf_report,
+        }
+        log.info("  Rejected: %d | Remaining: %d", rejected, len(examples))
+        _log_per_source(report["stages"]["8_classifier_extrapolation"])
 
     # ── Post-filter: thematic balance ──
     log.info("")

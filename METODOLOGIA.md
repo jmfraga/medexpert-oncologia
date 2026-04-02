@@ -150,10 +150,12 @@ El dataset combinado (292,862 pares Q&A) se somete a un pipeline de filtrado sec
 | 4 | Calidad de pregunta | Determinístico | ≥ 30 caracteres |
 | 5 | Deduplicación semántica intra-dataset | Embedding | Cosine similarity > 0.95 (all-MiniLM-L6-v2) |
 | 6 | Deduplicación cross-dataset (Sonnet vs MiniMax) | Embedding | Cosine similarity > 0.95 entre fuentes, retener respuesta más larga |
+| 7 | LLM-as-filter (5% muestra, Claude Sonnet 4.6, escala 0-5) | Model-based | Score < 3/5 → rechazo directo (~$51 USD) |
+| 8 | Extrapolación por clasificador (GradientBoosting sobre features de Stage 7) | Clasificador local | Predice calidad para el 95% no evaluado ($0) |
 
 #### Stage 7: LLM-as-filter — Scoring de calidad clínica
 
-El stage 7 utiliza un modelo frontier (Claude Sonnet 4.6) como evaluador experto para scoring de calidad clínica. Dado que evaluar los ~178K ejemplos restantes sería prohibitivamente costoso (~$100+ USD), se emplea un **muestreo estratificado del 5%** con extrapolación estadística:
+El stage 7 utiliza un modelo frontier (Claude Sonnet 4.6) como evaluador experto para scoring de calidad clínica. Dado que evaluar los ~261K ejemplos restantes sería prohibitivamente costoso (~$800+ USD), se emplea un **muestreo estratificado del 5%** con el Stage 8 como extrapolación:
 
 **Procedimiento de muestreo**:
 1. Se agrupan los ejemplos por estrato temático (tratamiento, diagnóstico, farmacología, soporte, seguimiento, otros)
@@ -169,15 +171,48 @@ El stage 7 utiliza un modelo frontier (Claude Sonnet 4.6) como evaluador experto
 
 **Umbral de rechazo**: score < 3/5
 
-**Extrapolación al dataset completo**: Los ejemplos evaluados que obtienen score < 3/5 se eliminan directamente del dataset. El 95% restante (no evaluado) se retiene bajo el supuesto de que los stages 1-6 ya eliminaron los problemas estructurales (formato, longitud, evasivas, duplicados), y el muestreo estratificado del 5% funciona como auditoría estadística de la calidad del contenido clínico. La tasa de rechazo observada en la muestra se reporta per-estrato y per-fuente (Sonnet vs MiniMax) como estimador de la calidad relativa de cada subpoblación, sin aplicar rechazo adicional a los no evaluados.
+**Extrapolación al dataset completo**: Los ejemplos evaluados que obtienen score < 3/5 se eliminan directamente del dataset. La tasa de rechazo observada en la muestra (37.2%) se reporta per-estrato y per-fuente como estimador de calidad. Los ejemplos no evaluados se procesan en Stage 8 mediante un clasificador entrenado con los scores del LLM (ver abajo).
 
-**Justificación del approach**:
-- Evaluar el 100% costaría ~$100+ USD y >50 horas de API calls
-- El 5% estratificado provee intervalos de confianza del 95% con margen de error < 1% por estrato (dado n > 200 por estrato)
-- La distribución de scores y tasa de rechazo per-fuente validan empíricamente la calidad diferencial entre Sonnet y MiniMax como teachers
-- Los rechazos directos (score < 3) eliminan ejemplos demostrablemente deficientes sin penalizar al grueso del dataset que no fue muestreado
+**Resultados reales de Stage 7** (ejecutado 2026-04-01/02):
+- Muestra evaluada: 12,967 ejemplos (5% pre-balance, no post-balance como se planeó originalmente)
+- Score promedio: 2.77/5
+- Tasa de rechazo: 37.2% (4,823 rechazados)
+- Per-estrato: tratamiento 39.7%, otros 38.9%, seguimiento 34.5%, diagnóstico 33.5%, farmacología 29.2%, soporte 28.7%
+- Per-fuente: MiniMax 2.0% de sus evaluados rechazados, Sonnet 0.8%
+- Costo real: ~$51 USD (mayor al estimado por muestreo pre-balance en vez de post-balance)
 
-**Costo estimado**: ~$5-10 USD (8,925 llamadas × ~600 tokens input × ~50 tokens output)
+**Costo estimado original**: ~$5-10 USD. **Costo real**: ~$51 USD. La diferencia se debe a que el muestreo del 5% se aplicó sobre el pool pre-balance temático (~261K) en vez del post-balance (~178K), resultando en 13,049 ejemplos evaluados en vez de ~8,925.
+
+#### Stage 8: Extrapolación por clasificador
+
+Dado que Stage 7 reveló una tasa de rechazo alta (37.2%), extrapolar los scores al 95% restante no evaluado es necesario para garantizar calidad. Se entrena un clasificador supervisado usando los 12,967 ejemplos evaluados por el LLM como datos etiquetados.
+
+**Features extraídas por ejemplo** (todas computables sin LLM):
+- `answer_len`: longitud de la respuesta en caracteres
+- `question_len`: longitud de la pregunta
+- `ratio_aq`: ratio respuesta/pregunta
+- `ttr`: type-token ratio (diversidad de vocabulario)
+- `is_sonnet`: fuente (Sonnet=1, MiniMax=0)
+- `word_count`: conteo de palabras
+- `sentence_count`: proxy de profundidad
+- `has_list`, `has_headers`: indicadores estructurales
+- `has_dosing`, `has_evidence`, `has_citation`: indicadores de contenido clínico
+- Stratum (one-hot): tratamiento, diagnóstico, farmacología, soporte, seguimiento, otros
+
+**Clasificador**: GradientBoosting (200 estimators, max_depth=5, min_samples_leaf=20)
+- Label: score >= 3 (pasa) vs < 3 (rechaza), del scoring LLM de Stage 7
+- **5-fold CV F1: 0.705 ± 0.040**
+- Top features por importancia: ratio_aq (21.4%), ttr (17.4%), answer_len (16.8%), is_sonnet (14.8%), word_count (10.5%)
+
+**Aplicación**: El clasificador predice calidad para los ~248K ejemplos no evaluados por el LLM. Los predichos como baja calidad se eliminan. Los evaluados por el LLM con score >= 3 se retienen sin re-evaluar.
+
+**Resultados**:
+- 30,469 ejemplos rechazados (12.3% de los no evaluados)
+- MiniMax: 30,427 rechazados (13.6%)
+- Sonnet: 42 rechazados (0.1%)
+- Costo: $0 (ejecución local, ~2 minutos)
+
+**Justificación**: Un F1 de 0.705 no es perfecto, pero dado que el clasificador opera sobre features correlacionadas con calidad clínica (diversidad léxica, ratio pregunta-respuesta, presencia de evidencia) y que los stages 1-6 ya eliminaron problemas estructurales, el balance entre precisión y costo es favorable. La alternativa (evaluar 248K con LLM) costaría ~$800+ USD.
 
 #### Balance temático (post-funnel)
 
