@@ -1,0 +1,52 @@
+=== FULL TRAINING (3000 iters) ===
+Model: mlx-community/gemma-4-31b-it-4bit
+Data: /Users/jmfraga/Projects/medexpert-oncologia/data/clean
+Adapters: /Users/jmfraga/Projects/medexpert-oncologia/adapters/gemma4-31b-onco
+Log: /Users/jmfraga/Projects/medexpert-oncologia/logs/training-gemma4-31b-onco.log
+Iterations: 3000
+Batch size: 2 (x2 grad accum = effective 4)
+Learning rate: 2e-5
+Max seq length: 2048
+LoRA rank: 64, scale: 32.0, dropout: 0.05
+
+Training examples:   142030
+Validation examples:     7885
+
+Starting LoRA training at sábado,  4 de abril de 2026, 00:07:55 CST...
+Loading configuration file /Users/jmfraga/Projects/medexpert-oncologia/lora-config-gemma4.yaml
+Loading pretrained model
+Fetching 11 files:   0%|          | 0/11 [00:00<?, ?it/s]Fetching 11 files: 100%|██████████| 11/11 [00:00<00:00, 24450.10it/s]
+You are using a model of type `gemma4` to instantiate a model of type ``. This may be expected if you are loading a checkpoint that shares a subset of the architecture (e.g., loading a `sam2_video` checkpoint into `Sam2Model`), but is otherwise not supported and can yield errors. Please verify that the checkpoint is compatible with the model you are instantiating.
+Loading datasets
+Training
+Trainable parameters: 1.595% (489.718M/30697.345M)
+Starting training..., iters: 3000
+Calculating loss...:   0%|          | 0/50 [00:00<?, ?it/s]Calculating loss...:   2%|▏         | 1/50 [00:05<04:26,  5.43s/it]Calculating loss...:   4%|▍         | 2/50 [00:12<04:53,  6.12s/it]Calculating loss...:   6%|▌         | 3/50 [00:17<04:28,  5.72s/it]Calculating loss...:   8%|▊         | 4/50 [00:22<04:14,  5.53s/it]Calculating loss...:  10%|█         | 5/50 [00:29<04:27,  5.95s/it]Calculating loss...:  12%|█▏        | 6/50 [00:36<04:47,  6.53s/it]Calculating loss...:  14%|█▍        | 7/50 [00:43<04:38,  6.49s/it]Calculating loss...:  16%|█▌        | 8/50 [00:50<04:41,  6.71s/it]Calculating loss...:  18%|█▊        | 9/50 [00:56<04:22,  6.41s/it]Calculating loss...:  20%|██        | 10/50 [01:03<04:26,  6.65s/it]Calculating loss...:  22%|██▏       | 11/50 [01:09<04:08,  6.37s/it]Calculating loss...:  24%|██▍       | 12/50 [01:14<03:54,  6.18s/it]Calculating loss...:  26%|██▌       | 13/50 [01:22<04:00,  6.50s/it]Calculating loss...:  28%|██▊       | 14/50 [01:29<04:02,  6.73s/it]Calculating loss...:  30%|███       | 15/50 [01:36<04:01,  6.90s/it]Calculating loss...:  32%|███▏      | 16/50 [01:43<03:50,  6.78s/it]Calculating loss...:  34%|███▍      | 17/50 [01:48<03:34,  6.49s/it]Calculating loss...:  36%|███▌      | 18/50 [01:56<03:35,  6.73s/it]Calculating loss...:  38%|███▊      | 19/50 [02:04<03:39,  7.08s/it]Calculating loss...:  40%|████      | 20/50 [02:12<03:47,  7.59s/it]Calculating loss...:  42%|████▏     | 21/50 [02:20<03:42,  7.67s/it]Calculating loss...:  44%|████▍     | 22/50 [02:27<03:24,  7.31s/it]Calculating loss...:  46%|████▌     | 23/50 [02:34<03:16,  7.27s/it]Calculating loss...:  48%|████▊     | 24/50 [02:40<02:56,  6.80s/it]Calculating loss...:  50%|█████     | 25/50 [02:46<02:47,  6.69s/it]Calculating loss...:  52%|█████▏    | 26/50 [02:53<02:38,  6.61s/it]Calculating loss...:  54%|█████▍    | 27/50 [03:00<02:35,  6.77s/it]Calculating loss...:  56%|█████▌    | 28/50 [03:07<02:31,  6.88s/it]Calculating loss...:  58%|█████▊    | 29/50 [03:14<02:25,  6.94s/it]Calculating loss...:  60%|██████    | 30/50 [03:20<02:15,  6.78s/it]Calculating loss...:  62%|██████▏   | 31/50 [03:25<01:58,  6.25s/it]Calculating loss...:  64%|██████▍   | 32/50 [03:31<01:49,  6.06s/it]Calculating loss...:  66%|██████▌   | 33/50 [03:38<01:48,  6.38s/it]Calculating loss...:  68%|██████▊   | 34/50 [03:47<01:52,  7.05s/it]Calculating loss...:  70%|███████   | 35/50 [03:52<01:39,  6.62s/it]Calculating loss...:  72%|███████▏  | 36/50 [03:59<01:31,  6.57s/it]Calculating loss...:  74%|███████▍  | 37/50 [04:06<01:27,  6.71s/it]Calculating loss...:  76%|███████▌  | 38/50 [04:11<01:16,  6.40s/it]Calculating loss...:  78%|███████▊  | 39/50 [04:18<01:10,  6.40s/it]Calculating loss...:  80%|████████  | 40/50 [04:25<01:06,  6.61s/it]Calculating loss...:  82%|████████▏ | 41/50 [04:32<01:00,  6.75s/it]Calculating loss...:  84%|████████▍ | 42/50 [04:40<00:56,  7.08s/it]Calculating loss...:  86%|████████▌ | 43/50 [04:46<00:48,  6.88s/it]Calculating loss...:  88%|████████▊ | 44/50 [04:52<00:39,  6.50s/it]Calculating loss...:  90%|█████████ | 45/50 [04:58<00:31,  6.26s/it]Calculating loss...:  92%|█████████▏| 46/50 [05:03<00:24,  6.08s/it]Calculating loss...:  94%|█████████▍| 47/50 [05:09<00:17,  5.95s/it]Calculating loss...:  96%|█████████▌| 48/50 [05:17<00:13,  6.51s/it]Calculating loss...:  98%|█████████▊| 49/50 [05:23<00:06,  6.48s/it]Calculating loss...: 100%|██████████| 50/50 [05:28<00:00,  6.03s/it]Calculating loss...: 100%|██████████| 50/50 [05:28<00:00,  6.57s/it]
+Iter 1: Val loss 8.746, Val took 328.605s
+Iter 10: Train loss 4.001, Learning Rate 2.000e-05, It/sec 0.047, Tokens/sec 12.345, Trained Tokens 2626, Peak mem 28.145 GB
+Iter 20: Train loss 1.868, Learning Rate 2.000e-05, It/sec 0.052, Tokens/sec 12.669, Trained Tokens 5066, Peak mem 28.145 GB
+Iter 30: Train loss 2.399, Learning Rate 2.000e-05, It/sec 0.049, Tokens/sec 13.372, Trained Tokens 7823, Peak mem 28.145 GB
+Iter 40: Train loss 2.033, Learning Rate 2.000e-05, It/sec 0.051, Tokens/sec 12.905, Trained Tokens 10349, Peak mem 28.145 GB
+Iter 50: Train loss 1.786, Learning Rate 2.000e-05, It/sec 0.050, Tokens/sec 12.752, Trained Tokens 12909, Peak mem 28.145 GB
+Iter 60: Train loss 1.835, Learning Rate 2.000e-05, It/sec 0.051, Tokens/sec 11.957, Trained Tokens 15258, Peak mem 28.145 GB
+Iter 70: Train loss 1.701, Learning Rate 2.000e-05, It/sec 0.045, Tokens/sec 12.490, Trained Tokens 18049, Peak mem 28.145 GB
+Iter 80: Train loss 1.577, Learning Rate 2.000e-05, It/sec 0.048, Tokens/sec 12.547, Trained Tokens 20663, Peak mem 28.408 GB
+Iter 90: Train loss 1.575, Learning Rate 2.000e-05, It/sec 0.048, Tokens/sec 13.189, Trained Tokens 23389, Peak mem 28.408 GB
+Iter 100: Train loss 1.377, Learning Rate 2.000e-05, It/sec 0.049, Tokens/sec 12.044, Trained Tokens 25853, Peak mem 28.408 GB
+Iter 110: Train loss 1.397, Learning Rate 2.000e-05, It/sec 0.043, Tokens/sec 12.261, Trained Tokens 28676, Peak mem 28.936 GB
+Iter 120: Train loss 1.410, Learning Rate 2.000e-05, It/sec 0.050, Tokens/sec 12.045, Trained Tokens 31074, Peak mem 28.936 GB
+Iter 130: Train loss 1.451, Learning Rate 2.000e-05, It/sec 0.049, Tokens/sec 12.344, Trained Tokens 33616, Peak mem 28.936 GB
+Iter 140: Train loss 1.411, Learning Rate 2.000e-05, It/sec 0.046, Tokens/sec 12.467, Trained Tokens 36348, Peak mem 28.936 GB
+Iter 150: Train loss 1.398, Learning Rate 2.000e-05, It/sec 0.044, Tokens/sec 12.708, Trained Tokens 39262, Peak mem 28.936 GB
+Iter 160: Train loss 1.399, Learning Rate 2.000e-05, It/sec 0.048, Tokens/sec 12.202, Trained Tokens 41818, Peak mem 28.936 GB
+Iter 170: Train loss 1.398, Learning Rate 2.000e-05, It/sec 0.046, Tokens/sec 12.192, Trained Tokens 44496, Peak mem 28.936 GB
+Iter 180: Train loss 1.428, Learning Rate 2.000e-05, It/sec 0.049, Tokens/sec 11.686, Trained Tokens 46888, Peak mem 28.936 GB
+libc++abi: terminating due to uncaught exception of type std::runtime_error: [METAL] Command buffer execution failed: Insufficient Memory (00000008:kIOGPUCommandBufferCallbackErrorOutOfMemory)
+/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/resource_tracker.py:396: UserWarning: resource_tracker: There appear to be 1 leaked semaphore objects to clean up at shutdown: {'/loky-77383-ll4xywxb'}
+  warnings.warn(
+
+Training complete at sábado,  4 de abril de 2026, 01:24:21 CST
+Adapters saved to: /Users/jmfraga/Projects/medexpert-oncologia/adapters/gemma4-31b-onco
+
+=== Loss Summary ===
+Iter 1: Val loss 8.746, Val took 328.605s

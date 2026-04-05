@@ -1,5 +1,16 @@
-# LoRA adapter weights (too large for git, backup to Kingston)
+# LoRA adapter weights (too large for git, backup via rsync)
 adapters/
+
+# Large dataset files (backup via rsync, not git)
+data/clean/train.jsonl
+data/clean/valid.jsonl
+data/clean/test.jsonl
+data/clean/llm_scores.json
+data/all_quality_chunks.jsonl
+data/batch1/
+data/batch2/
+data/batch_minimax.log
+data/pilot_minimax_50.jsonl
 
 # Python
 __pycache__/

@@ -1,0 +1,89 @@
+2026-04-02 13:27:08,236 [INFO] ============================================================
+2026-04-02 13:27:08,236 [INFO] DATASET QUALITY FUNNEL
+2026-04-02 13:27:08,237 [INFO] ============================================================
+2026-04-02 13:27:08,237 [INFO] Input: /Users/jmfraga/Projects/medexpert-oncologia/data
+2026-04-02 13:27:08,237 [INFO] Output: /Users/jmfraga/Projects/medexpert-oncologia/data/clean
+2026-04-02 13:27:08,237 [INFO] Dry run: False
+2026-04-02 13:27:08,237 [INFO] Skip LLM filter: False
+2026-04-02 13:27:08,237 [INFO] Skip dedup: True
+2026-04-02 13:27:08,237 [INFO] Skip extrapolation: False
+2026-04-02 13:27:08,237 [INFO] Scores file: data/clean/llm_scores.json
+2026-04-02 13:27:08,237 [INFO] 
+2026-04-02 13:27:08,237 [INFO] Loading datasets...
+2026-04-02 13:27:08,344 [INFO]   Sonnet (all_examples.jsonl): 34728 entries
+2026-04-02 13:27:08,716 [INFO]   MiniMax (batch1): 129135 entries
+2026-04-02 13:27:09,112 [INFO]   MiniMax (batch2): 128999 entries
+2026-04-02 13:27:09,141 [INFO] Total loaded: 292862 examples
+2026-04-02 13:27:09,141 [INFO]   minimax: 258134 (88.1%)
+2026-04-02 13:27:09,141 [INFO]   sonnet: 34728 (11.9%)
+2026-04-02 13:27:09,141 [INFO] 
+2026-04-02 13:27:09,141 [INFO] Stage 1: Encoding and format validation...
+2026-04-02 13:27:09,316 [INFO]   Rejected: 0 | Remaining: 292862
+2026-04-02 13:27:09,317 [INFO]     minimax: 258134 → 258134 (-0, 0.0% rechazado)
+2026-04-02 13:27:09,317 [INFO]     sonnet: 34728 → 34728 (-0, 0.0% rechazado)
+2026-04-02 13:27:09,317 [INFO] 
+2026-04-02 13:27:09,317 [INFO] Stage 2: Minimum response length (>=300 chars)...
+2026-04-02 13:27:09,408 [INFO]   Rejected: 28225 | Remaining: 264637
+2026-04-02 13:27:09,408 [INFO]     minimax: 258134 → 230725 (-27409, 10.6% rechazado)
+2026-04-02 13:27:09,408 [INFO]     sonnet: 34728 → 33912 (-816, 2.4% rechazado)
+2026-04-02 13:27:09,408 [INFO] 
+2026-04-02 13:27:09,408 [INFO] Stage 3: Evasive response detection...
+2026-04-02 13:27:26,546 [INFO]   Rejected: 36 | Remaining: 264601
+2026-04-02 13:27:26,546 [INFO]     minimax: 230725 → 230698 (-27, 0.0% rechazado)
+2026-04-02 13:27:26,546 [INFO]     sonnet: 33912 → 33903 (-9, 0.0% rechazado)
+2026-04-02 13:27:26,546 [INFO] 
+2026-04-02 13:27:26,546 [INFO] Stage 4: Question quality (>=30 chars)...
+2026-04-02 13:27:26,629 [INFO]   Rejected: 1 | Remaining: 264600
+2026-04-02 13:27:26,629 [INFO]     minimax: 230698 → 230697 (-1, 0.0% rechazado)
+2026-04-02 13:27:26,629 [INFO]     sonnet: 33903 → 33903 (-0, 0.0% rechazado)
+2026-04-02 13:27:26,629 [INFO] 
+2026-04-02 13:27:26,629 [INFO] Classifying clinical strata...
+2026-04-02 13:27:34,846 [INFO]   Stratum distribution (pre-dedup): {'tratamiento': 155923, 'diagnostico': 52514, 'farmacologia': 18288, 'otros': 17137, 'seguimiento': 16191, 'soporte': 4547}
+2026-04-02 13:27:34,846 [INFO] 
+2026-04-02 13:27:34,846 [INFO] Stage 5: SKIPPED (--skip-dedup)
+2026-04-02 13:27:34,846 [INFO] 
+2026-04-02 13:27:34,846 [INFO] Stage 6: SKIPPED (--skip-dedup)
+2026-04-02 13:27:34,846 [INFO] 
+2026-04-02 13:27:34,846 [INFO] Stage 7: Loading scores from data/clean/llm_scores.json (skipping LLM calls)...
+2026-04-02 13:27:34,940 [INFO]   Scored: 12967 | Rejected: 4823 | Remaining: 259777
+2026-04-02 13:27:34,940 [INFO]     minimax: 230697 → 226135 (-4562, 2.0% rechazado)
+2026-04-02 13:27:34,940 [INFO]     sonnet: 33903 → 33642 (-261, 0.8% rechazado)
+2026-04-02 13:27:34,940 [INFO] 
+2026-04-02 13:27:34,940 [INFO] Stage 8: Classifier-based extrapolation of LLM quality scores...
+2026-04-02 13:27:39,778 [INFO]   Extracting features for 259777 current examples...
+Traceback (most recent call last):
+  File "/Users/jmfraga/Projects/medexpert-oncologia/02b_clean_dataset.py", line 1274, in <module>
+    main()
+    ~~~~^^
+  File "/Users/jmfraga/Projects/medexpert-oncologia/02b_clean_dataset.py", line 1134, in main
+    examples, rejected, clf_report = stage8_classifier_extrapolation(
+                                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        examples, scores_log, min_score=LLM_MIN_SCORE,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/jmfraga/Projects/medexpert-oncologia/02b_clean_dataset.py", line 606, in stage8_classifier_extrapolation
+    all_features = [_extract_features(ex) for ex in examples]
+                    ~~~~~~~~~~~~~~~~~^^^^
+  File "/Users/jmfraga/Projects/medexpert-oncologia/02b_clean_dataset.py", line 553, in _extract_features
+    has_list = 1 if re.search(r"(?m)^[\s]*[-•*]\s|(?m)^\s*\d+[.)]\s", answer) else 0
+                    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/re/__init__.py", line 177, in search
+    return _compile(pattern, flags).search(string)
+           ~~~~~~~~^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/re/__init__.py", line 350, in _compile
+    p = _compiler.compile(pattern, flags)
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/re/_compiler.py", line 762, in compile
+    p = _parser.parse(p, flags)
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/re/_parser.py", line 973, in parse
+    p = _parse_sub(source, state, flags & SRE_FLAG_VERBOSE, 0)
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/re/_parser.py", line 460, in _parse_sub
+    itemsappend(_parse(source, state, verbose, nested + 1,
+                ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                       not nested and not items))
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.14/3.14.3_1/Frameworks/Python.framework/Versions/3.14/lib/python3.14/re/_parser.py", line 834, in _parse
+    raise source.error('global flags not at the start '
+                       'of the expression',
+                       source.tell() - start)
+re.PatternError: global flags not at the start of the expression at position 18

@@ -1,0 +1,101 @@
+{
+  "timestamp": "2026-03-31T08:56:02.126376",
+  "input_dir": "/Users/jmfraga/Projects/medexpert-oncologia/data",
+  "output_dir": "/Users/jmfraga/Projects/medexpert-oncologia/data/clean",
+  "total_initial": 265650,
+  "stages": {
+    "1_format_validation": {
+      "rejected": 0,
+      "remaining": 265650
+    },
+    "2_min_response_length": {
+      "threshold": 300,
+      "rejected": 24549,
+      "remaining": 241101
+    },
+    "3_evasive_detection": {
+      "rejected": 30,
+      "remaining": 241071
+    },
+    "4_question_quality": {
+      "threshold": 30,
+      "rejected": 1,
+      "remaining": 241070
+    },
+    "5_semantic_dedup": {
+      "skipped": true,
+      "remaining": 241070
+    },
+    "6_cross_dataset_dedup": {
+      "skipped": true,
+      "remaining": 241070
+    },
+    "7_llm_filter": {
+      "skipped": true,
+      "remaining": 241070
+    }
+  },
+  "thematic_balance": {
+    "diagnostico": {
+      "count_before": 47706,
+      "fraction_before": 0.1979,
+      "count_after": 47706,
+      "fraction_after": 0.2896
+    },
+    "farmacologia": {
+      "count_before": 15923,
+      "fraction_before": 0.0661,
+      "count_after": 15923,
+      "fraction_after": 0.0967
+    },
+    "tratamiento": {
+      "count_before": 142249,
+      "fraction_before": 0.5901,
+      "count_after": 65888,
+      "fraction_after": 0.4
+    },
+    "soporte": {
+      "count_before": 4353,
+      "fraction_before": 0.0181,
+      "count_after": 4353,
+      "fraction_after": 0.0264
+    },
+    "seguimiento": {
+      "count_before": 15064,
+      "fraction_before": 0.0625,
+      "count_after": 15064,
+      "fraction_after": 0.0915
+    },
+    "otros": {
+      "count_before": 15775,
+      "fraction_before": 0.0654,
+      "count_after": 15775,
+      "fraction_after": 0.0958
+    }
+  },
+  "subsampled_count": 76361,
+  "final": {
+    "total_after_funnel": 164709,
+    "train": 148231,
+    "valid": 8229,
+    "test": 8249,
+    "source_distribution": {
+      "minimax": 137309,
+      "sonnet": 27400
+    },
+    "stratum_distribution": {
+      "tratamiento": 65888,
+      "diagnostico": 47706,
+      "farmacologia": 15923,
+      "otros": 15775,
+      "seguimiento": 15064,
+      "soporte": 4353
+    },
+    "response_length_stats": {
+      "min": 300,
+      "max": 6333,
+      "mean": 514.5,
+      "median": 494
+    }
+  }
+}

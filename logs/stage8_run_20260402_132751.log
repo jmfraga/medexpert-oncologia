@@ -1,0 +1,125 @@
+2026-04-02 13:27:51,459 [INFO] ============================================================
+2026-04-02 13:27:51,460 [INFO] DATASET QUALITY FUNNEL
+2026-04-02 13:27:51,460 [INFO] ============================================================
+2026-04-02 13:27:51,460 [INFO] Input: /Users/jmfraga/Projects/medexpert-oncologia/data
+2026-04-02 13:27:51,460 [INFO] Output: /Users/jmfraga/Projects/medexpert-oncologia/data/clean
+2026-04-02 13:27:51,460 [INFO] Dry run: False
+2026-04-02 13:27:51,460 [INFO] Skip LLM filter: False
+2026-04-02 13:27:51,460 [INFO] Skip dedup: True
+2026-04-02 13:27:51,460 [INFO] Skip extrapolation: False
+2026-04-02 13:27:51,460 [INFO] Scores file: data/clean/llm_scores.json
+2026-04-02 13:27:51,460 [INFO] 
+2026-04-02 13:27:51,460 [INFO] Loading datasets...
+2026-04-02 13:27:51,570 [INFO]   Sonnet (all_examples.jsonl): 34728 entries
+2026-04-02 13:27:51,951 [INFO]   MiniMax (batch1): 129135 entries
+2026-04-02 13:27:52,352 [INFO]   MiniMax (batch2): 128999 entries
+2026-04-02 13:27:52,381 [INFO] Total loaded: 292862 examples
+2026-04-02 13:27:52,381 [INFO]   minimax: 258134 (88.1%)
+2026-04-02 13:27:52,381 [INFO]   sonnet: 34728 (11.9%)
+2026-04-02 13:27:52,381 [INFO] 
+2026-04-02 13:27:52,381 [INFO] Stage 1: Encoding and format validation...
+2026-04-02 13:27:52,560 [INFO]   Rejected: 0 | Remaining: 292862
+2026-04-02 13:27:52,560 [INFO]     minimax: 258134 → 258134 (-0, 0.0% rechazado)
+2026-04-02 13:27:52,560 [INFO]     sonnet: 34728 → 34728 (-0, 0.0% rechazado)
+2026-04-02 13:27:52,560 [INFO] 
+2026-04-02 13:27:52,560 [INFO] Stage 2: Minimum response length (>=300 chars)...
+2026-04-02 13:27:52,650 [INFO]   Rejected: 28225 | Remaining: 264637
+2026-04-02 13:27:52,650 [INFO]     minimax: 258134 → 230725 (-27409, 10.6% rechazado)
+2026-04-02 13:27:52,650 [INFO]     sonnet: 34728 → 33912 (-816, 2.4% rechazado)
+2026-04-02 13:27:52,650 [INFO] 
+2026-04-02 13:27:52,650 [INFO] Stage 3: Evasive response detection...
+2026-04-02 13:28:09,854 [INFO]   Rejected: 36 | Remaining: 264601
+2026-04-02 13:28:09,854 [INFO]     minimax: 230725 → 230698 (-27, 0.0% rechazado)
+2026-04-02 13:28:09,854 [INFO]     sonnet: 33912 → 33903 (-9, 0.0% rechazado)
+2026-04-02 13:28:09,854 [INFO] 
+2026-04-02 13:28:09,854 [INFO] Stage 4: Question quality (>=30 chars)...
+2026-04-02 13:28:09,939 [INFO]   Rejected: 1 | Remaining: 264600
+2026-04-02 13:28:09,939 [INFO]     minimax: 230698 → 230697 (-1, 0.0% rechazado)
+2026-04-02 13:28:09,939 [INFO]     sonnet: 33903 → 33903 (-0, 0.0% rechazado)
+2026-04-02 13:28:09,939 [INFO] 
+2026-04-02 13:28:09,939 [INFO] Classifying clinical strata...
+2026-04-02 13:28:18,164 [INFO]   Stratum distribution (pre-dedup): {'tratamiento': 155923, 'diagnostico': 52514, 'farmacologia': 18288, 'otros': 17137, 'seguimiento': 16191, 'soporte': 4547}
+2026-04-02 13:28:18,164 [INFO] 
+2026-04-02 13:28:18,164 [INFO] Stage 5: SKIPPED (--skip-dedup)
+2026-04-02 13:28:18,164 [INFO] 
+2026-04-02 13:28:18,164 [INFO] Stage 6: SKIPPED (--skip-dedup)
+2026-04-02 13:28:18,164 [INFO] 
+2026-04-02 13:28:18,164 [INFO] Stage 7: Loading scores from data/clean/llm_scores.json (skipping LLM calls)...
+2026-04-02 13:28:18,259 [INFO]   Scored: 12967 | Rejected: 4823 | Remaining: 259777
+2026-04-02 13:28:18,259 [INFO]     minimax: 230697 → 226135 (-4562, 2.0% rechazado)
+2026-04-02 13:28:18,259 [INFO]     sonnet: 33903 → 33642 (-261, 0.8% rechazado)
+2026-04-02 13:28:18,259 [INFO] 
+2026-04-02 13:28:18,259 [INFO] Stage 8: Classifier-based extrapolation of LLM quality scores...
+2026-04-02 13:28:18,755 [INFO]   Extracting features for 259777 current examples...
+2026-04-02 13:28:27,614 [INFO]   Reloading original data (stages 1-4 only) for negative examples...
+2026-04-02 13:28:54,209 [INFO]   Reconstructed post-stage4 list: 264600 examples
+2026-04-02 13:28:54,647 [INFO]   Training data: 8144 pass + 4823 fail = 12967 labeled examples
+2026-04-02 13:28:54,653 [INFO]   Training GradientBoosting classifier...
+2026-04-02 13:29:09,928 [INFO]   5-fold CV F1: 0.705 +/- 0.040
+2026-04-02 13:29:09,929 [INFO]   Top features:
+2026-04-02 13:29:09,929 [INFO]     ratio_aq: 0.214
+2026-04-02 13:29:09,929 [INFO]     ttr: 0.174
+2026-04-02 13:29:09,929 [INFO]     answer_len: 0.168
+2026-04-02 13:29:09,929 [INFO]     is_sonnet: 0.148
+2026-04-02 13:29:09,929 [INFO]     word_count: 0.105
+2026-04-02 13:29:09,937 [INFO]   Predicting quality for unscored examples...
+2026-04-02 13:29:27,737 [INFO]   Unscored examples: 251633
+2026-04-02 13:29:27,737 [INFO]   Predicted reject: 30209 (12.0%)
+2026-04-02 13:29:27,887 [INFO]   Rejected: 30209 | Remaining: 229568
+2026-04-02 13:29:27,887 [INFO]     minimax: 226135 → 195963 (-30172, 13.3% rechazado)
+2026-04-02 13:29:27,887 [INFO]     sonnet: 33642 → 33605 (-37, 0.1% rechazado)
+2026-04-02 13:29:27,887 [INFO] 
+2026-04-02 13:29:27,887 [INFO] Post-filter: thematic balance verification (max 40% per stratum)...
+2026-04-02 13:29:28,389 [INFO]   Subsampled: 69030 examples removed for balance
+2026-04-02 13:29:28,389 [INFO]   After balancing: 160538 examples
+2026-04-02 13:29:28,389 [INFO]     diagnostico: 46613 (29.0%)
+2026-04-02 13:29:28,389 [INFO]     farmacologia: 16016 (10.0%)
+2026-04-02 13:29:28,389 [INFO]     otros: 15360 (9.6%)
+2026-04-02 13:29:28,389 [INFO]     seguimiento: 14187 (8.8%)
+2026-04-02 13:29:28,389 [INFO]     soporte: 4143 (2.6%)
+2026-04-02 13:29:28,389 [INFO]     tratamiento: 64219 (40.0%)
+2026-04-02 13:29:28,389 [INFO] 
+2026-04-02 13:29:28,389 [INFO] Splitting 90/5/5 (stratified by source + stratum)...
+2026-04-02 13:29:28,484 [INFO]   Train: 144479 | Valid: 8022 | Test: 8037
+2026-04-02 13:29:28,631 [INFO] 
+2026-04-02 13:29:28,631 [INFO] ============================================================
+2026-04-02 13:29:28,631 [INFO] FUNNEL SUMMARY
+2026-04-02 13:29:28,631 [INFO] ============================================================
+2026-04-02 13:29:28,631 [INFO]   Initial:      292862
+2026-04-02 13:29:28,631 [INFO]   1_format_validation: -0 rejected
+2026-04-02 13:29:28,631 [INFO]   2_min_response_length: -28225 rejected
+2026-04-02 13:29:28,631 [INFO]   3_evasive_detection: -36 rejected
+2026-04-02 13:29:28,631 [INFO]   4_question_quality: -1 rejected
+2026-04-02 13:29:28,631 [INFO]   5_semantic_dedup: SKIPPED
+2026-04-02 13:29:28,631 [INFO]   6_cross_dataset_dedup: SKIPPED
+2026-04-02 13:29:28,631 [INFO]   7_llm_filter: -4823 rejected
+2026-04-02 13:29:28,631 [INFO]   8_classifier_extrapolation: -30209 rejected
+2026-04-02 13:29:28,631 [INFO]   Balance subsample: -69030
+2026-04-02 13:29:28,631 [INFO]   ─────────────────────────────
+2026-04-02 13:29:28,631 [INFO]   Final:        160538 (54.8% retained)
+2026-04-02 13:29:28,631 [INFO]   Train/Val/Test: 144479 / 8022 / 8037
+2026-04-02 13:29:28,632 [INFO] 
+2026-04-02 13:29:28,632 [INFO] ============================================================
+2026-04-02 13:29:28,632 [INFO] PER-SOURCE COMPARISON
+2026-04-02 13:29:28,632 [INFO] ============================================================
+2026-04-02 13:29:28,672 [INFO]   minimax: 258134 → 133166 (51.6% retained)
+2026-04-02 13:29:28,672 [INFO]     2_min_response_length: -27409 (10.6%)
+2026-04-02 13:29:28,672 [INFO]     3_evasive_detection: -27 (0.0%)
+2026-04-02 13:29:28,672 [INFO]     4_question_quality: -1 (0.0%)
+2026-04-02 13:29:28,672 [INFO]     7_llm_filter: -4562 (2.0%)
+2026-04-02 13:29:28,672 [INFO]     8_classifier_extrapolation: -30172 (13.3%)
+2026-04-02 13:29:28,672 [INFO]   sonnet: 34728 → 27372 (78.8% retained)
+2026-04-02 13:29:28,672 [INFO]     2_min_response_length: -816 (2.4%)
+2026-04-02 13:29:28,672 [INFO]     3_evasive_detection: -9 (0.0%)
+2026-04-02 13:29:28,672 [INFO]     7_llm_filter: -261 (0.8%)
+2026-04-02 13:29:28,672 [INFO]     8_classifier_extrapolation: -37 (0.1%)
+2026-04-02 13:29:28,672 [INFO]   Response length: mean=522, median=503, min=300, max=6333
+2026-04-02 13:29:29,638 [INFO] 
+2026-04-02 13:29:29,638 [INFO] Output files:
+2026-04-02 13:29:29,638 [INFO]   /Users/jmfraga/Projects/medexpert-oncologia/data/clean/train.jsonl (144479 examples)
+2026-04-02 13:29:29,638 [INFO]   /Users/jmfraga/Projects/medexpert-oncologia/data/clean/valid.jsonl (8022 examples)
+2026-04-02 13:29:29,638 [INFO]   /Users/jmfraga/Projects/medexpert-oncologia/data/clean/test.jsonl (8037 examples)
+2026-04-02 13:29:29,638 [INFO]   Report: /Users/jmfraga/Projects/medexpert-oncologia/data/clean/cleanup_report.json
+2026-04-02 13:29:29,688 [INFO]   LLM scores: /Users/jmfraga/Projects/medexpert-oncologia/data/clean/llm_scores.json
+2026-04-02 13:29:29,689 [INFO] 
+2026-04-02 13:29:29,689 [INFO] Done.

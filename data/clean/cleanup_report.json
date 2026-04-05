@@ -1,0 +1,243 @@
+{
+  "timestamp": "2026-04-02T13:35:18.458364",
+  "input_dir": "/Users/jmfraga/Projects/medexpert-oncologia/data",
+  "output_dir": "/Users/jmfraga/Projects/medexpert-oncologia/data/clean",
+  "total_initial": 292862,
+  "stages": {
+    "1_format_validation": {
+      "rejected": 0,
+      "remaining": 292862,
+      "per_source": {
+        "minimax": {
+          "before": 258134,
+          "rejected": 0,
+          "remaining": 258134,
+          "rejection_rate": 0.0
+        },
+        "sonnet": {
+          "before": 34728,
+          "rejected": 0,
+          "remaining": 34728,
+          "rejection_rate": 0.0
+        }
+      }
+    },
+    "2_min_response_length": {
+      "threshold": 300,
+      "rejected": 28225,
+      "remaining": 264637,
+      "per_source": {
+        "minimax": {
+          "before": 258134,
+          "rejected": 27409,
+          "remaining": 230725,
+          "rejection_rate": 0.1062
+        },
+        "sonnet": {
+          "before": 34728,
+          "rejected": 816,
+          "remaining": 33912,
+          "rejection_rate": 0.0235
+        }
+      }
+    },
+    "3_evasive_detection": {
+      "rejected": 36,
+      "remaining": 264601,
+      "per_source": {
+        "minimax": {
+          "before": 230725,
+          "rejected": 27,
+          "remaining": 230698,
+          "rejection_rate": 0.0001
+        },
+        "sonnet": {
+          "before": 33912,
+          "rejected": 9,
+          "remaining": 33903,
+          "rejection_rate": 0.0003
+        }
+      }
+    },
+    "4_question_quality": {
+      "threshold": 30,
+      "rejected": 1,
+      "remaining": 264600,
+      "per_source": {
+        "minimax": {
+          "before": 230698,
+          "rejected": 1,
+          "remaining": 230697,
+          "rejection_rate": 0.0
+        },
+        "sonnet": {
+          "before": 33903,
+          "rejected": 0,
+          "remaining": 33903,
+          "rejection_rate": 0.0
+        }
+      }
+    },
+    "5_semantic_dedup": {
+      "threshold": 0.95,
+      "rejected": 3543,
+      "remaining": 261057,
+      "per_source": {
+        "minimax": {
+          "before": 230697,
+          "rejected": 3046,
+          "remaining": 227651,
+          "rejection_rate": 0.0132
+        },
+        "sonnet": {
+          "before": 33903,
+          "rejected": 497,
+          "remaining": 33406,
+          "rejection_rate": 0.0147
+        }
+      }
+    },
+    "6_cross_dataset_dedup": {
+      "threshold": 0.95,
+      "rejected": 0,
+      "remaining": 261057,
+      "per_source": {
+        "minimax": {
+          "before": 227651,
+          "rejected": 0,
+          "remaining": 227651,
+          "rejection_rate": 0.0
+        },
+        "sonnet": {
+          "before": 33406,
+          "rejected": 0,
+          "remaining": 33406,
+          "rejection_rate": 0.0
+        }
+      }
+    },
+    "7_llm_filter": {
+      "source": "data/clean/llm_scores.json",
+      "scored": 12967,
+      "rejected": 4823,
+      "remaining": 256234,
+      "per_source": {
+        "minimax": {
+          "before": 227651,
+          "rejected": 4569,
+          "remaining": 223082,
+          "rejection_rate": 0.0201
+        },
+        "sonnet": {
+          "before": 33406,
+          "rejected": 254,
+          "remaining": 33152,
+          "rejection_rate": 0.0076
+        }
+      },
+      "avg_score": 2.77
+    },
+    "8_classifier_extrapolation": {
+      "rejected": 30469,
+      "remaining": 225765,
+      "per_source": {
+        "minimax": {
+          "before": 223082,
+          "rejected": 30427,
+          "remaining": 192655,
+          "rejection_rate": 0.1364
+        },
+        "sonnet": {
+          "before": 33152,
+          "rejected": 42,
+          "remaining": 33110,
+          "rejection_rate": 0.0013
+        }
+      },
+      "classifier": {
+        "labeled_pass": 8144,
+        "labeled_fail": 4823,
+        "cv_f1_mean": 0.7046,
+        "cv_f1_std": 0.0404,
+        "top_features": {
+          "ratio_aq": 0.2143,
+          "ttr": 0.1743,
+          "answer_len": 0.1676,
+          "is_sonnet": 0.1478,
+          "word_count": 0.105,
+          "question_len": 0.1047,
+          "sentence_count": 0.0285,
+          "has_citation": 0.0165,
+          "stratum_tratamiento": 0.0134,
+          "stratum_otros": 0.0072
+        },
+        "unscored_total": 248347,
+        "predicted_reject": 30469,
+        "predicted_reject_rate": 0.1227
+      }
+    }
+  },
+  "thematic_balance": {
+    "diagnostico": {
+      "count_before": 45922,
+      "fraction_before": 0.2034,
+      "count_after": 45922,
+      "fraction_after": 0.291
+    },
+    "farmacologia": {
+      "count_before": 15824,
+      "fraction_before": 0.0701,
+      "count_after": 15824,
+      "fraction_after": 0.1003
+    },
+    "tratamiento": {
+      "count_before": 131079,
+      "fraction_before": 0.5806,
+      "count_after": 63130,
+      "fraction_after": 0.4
+    },
+    "soporte": {
+      "count_before": 4079,
+      "fraction_before": 0.0181,
+      "count_after": 4079,
+      "fraction_after": 0.0258
+    },
+    "seguimiento": {
+      "count_before": 13984,
+      "fraction_before": 0.0619,
+      "count_after": 13984,
+      "fraction_after": 0.0886
+    },
+    "otros": {
+      "count_before": 14877,
+      "fraction_before": 0.0659,
+      "count_after": 14877,
+      "fraction_after": 0.0943
+    }
+  },
+  "subsampled_count": 67949,
+  "final": {
+    "total_after_funnel": 157816,
+    "train": 142030,
+    "valid": 7885,
+    "test": 7901,
+    "source_distribution": {
+      "minimax": 130916,
+      "sonnet": 26900
+    },
+    "stratum_distribution": {
+      "tratamiento": 63130,
+      "diagnostico": 45922,
+      "farmacologia": 15824,
+      "otros": 14877,
+      "seguimiento": 13984,
+      "soporte": 4079
+    },
+    "response_length_stats": {
+      "min": 300,
+      "max": 6333,
+      "mean": 522.4,
+      "median": 504
+    }
+  }
+}
