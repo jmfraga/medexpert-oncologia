@@ -1,0 +1,17 @@
+# Model weights (hosted on Hugging Face)
+adapters/
+models/
+*.safetensors
+
+# Copyrighted / derived data — NOT redistributable (NCCN, ESMO, IMSS, etc.)
+data/
+*.jsonl
+
+# Runtime
+logs/
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.venv/
+venv/

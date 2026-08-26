@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+title: "Retrieval-Augmentation and Fine-Tuning Do Not Improve — and Can Degrade — Base Language Models for Clinical Oncology"
+message: "If you use this software or its findings, please cite the associated paper."
+authors:
+  - family-names: "Fraga Sastrías"
+    given-names: "Juan Manuel"
+year: 2026
+repository-code: "https://github.com/jmfraga/medexpert-oncologia"
+license: MIT
